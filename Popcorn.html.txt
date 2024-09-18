@@ -1,0 +1,134 @@
+<p>&lt;!DOCTYPE html&gt;<br />
+&lt;html lang=&quot;en&quot;&gt;<br />
+&lt;head&gt;<br />
+&nbsp; &nbsp; &lt;meta charset=&quot;UTF-8&quot;&gt;<br />
+&nbsp; &nbsp; &lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;&gt;<br />
+&nbsp; &nbsp; &lt;title&gt;Popcorn Pop Detection&lt;/title&gt;<br />
+&nbsp; &nbsp; &lt;link rel=&quot;stylesheet&quot; href=&quot;https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css&quot;&gt;<br />
+&nbsp; &nbsp; &lt;style&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; #status {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; font-weight: bold;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; }<br />
+&nbsp; &nbsp; &nbsp; &nbsp; .popup {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; display: none;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; position: fixed;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; left: 50%;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; top: 50%;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; transform: translate(-50%, -50%);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; background: white;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; border: 1px solid #ccc;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; padding: 20px;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; z-index: 1000;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; }<br />
+&nbsp; &nbsp; &nbsp; &nbsp; .popup button {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; margin-top: 10px;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; }<br />
+&nbsp; &nbsp; &lt;/style&gt;<br />
+&nbsp; &nbsp; &lt;script&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; let audioContext, microphone, analyser, dataArray, prevPopTime = 0;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; let volumeThreshold = 200; // Default volume threshold<br />
+&nbsp; &nbsp; &nbsp; &nbsp; let popInterval = 2; // Default interval in seconds<br />
+&nbsp; &nbsp; &nbsp; &nbsp; let fftSize = 256; // Default FFT size for sensitivity</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; async function startDetection() {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; try {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; document.getElementById(&#39;status&#39;).textContent = &quot;Listening...&quot;;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; const stream = await navigator.mediaDevices.getUserMedia({ audio: true });<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; audioContext = new AudioContext();<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; microphone = audioContext.createMediaStreamSource(stream);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; analyser = audioContext.createAnalyser();<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; analyser.fftSize = fftSize;</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; dataArray = new Uint8Array(analyser.frequencyBinCount);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; microphone.connect(analyser);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; detectPops();<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; } catch (error) {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; document.getElementById(&#39;status&#39;).textContent = &quot;Error: Unable to access microphone.&quot;;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; console.error(&#39;Error accessing microphone:&#39;, error);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; }<br />
+&nbsp; &nbsp; &nbsp; &nbsp; }</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; function detectPops() {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; analyser.getByteTimeDomainData(dataArray);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; let maxVolume = Math.max(...dataArray);</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; if (maxVolume &gt; volumeThreshold) {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; const currentTime = audioContext.currentTime;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; if (currentTime - prevPopTime &gt;= popInterval) {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; showPopup(&#39;Popcorn DONE!&#39;);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; }<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; prevPopTime = currentTime;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; }</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; requestAnimationFrame(detectPops);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; }</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; function stopDetection() {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; if (audioContext) {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; audioContext.close();<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; document.getElementById(&#39;status&#39;).textContent = &#39;Detection stopped.&#39;;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; }<br />
+&nbsp; &nbsp; &nbsp; &nbsp; }</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; function updateSettings() {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; volumeThreshold = document.getElementById(&#39;volumeThreshold&#39;).value;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; popInterval = document.getElementById(&#39;popInterval&#39;).value;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; fftSize = document.getElementById(&#39;sensitivity&#39;).value;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; document.getElementById(&#39;thresholdValue&#39;).textContent = volumeThreshold;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; document.getElementById(&#39;intervalValue&#39;).textContent = popInterval;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; document.getElementById(&#39;sensitivityValue&#39;).textContent = fftSize;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; }</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; function showPopup(message) {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; const popup = document.getElementById(&#39;popup&#39;);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; popup.querySelector(&#39;.message&#39;).textContent = message;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; popup.style.display = &#39;block&#39;;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; }</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; function closePopup() {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; document.getElementById(&#39;popup&#39;).style.display = &#39;none&#39;;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; }<br />
+&nbsp; &nbsp; &lt;/script&gt;<br />
+&lt;/head&gt;<br />
+&lt;body&gt;</p>
+
+<p>&nbsp; &nbsp; &lt;main class=&quot;container&quot;&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;h2&gt;Popcorn Pop Detection&lt;/h2&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;p&gt;Press &quot;Start Detection&quot; to begin analyzing the sound and detecting popcorn pops. Customize the settings below:&lt;/p&gt;</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; &lt;p&gt;Instructions:&lt;/p&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;ul&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &lt;li&gt;Allow the site to use your microphone.&lt;/li&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &lt;li&gt;Adjust settings as needed.&lt;/li&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &lt;li&gt;When 2 seconds (or your selected interval) pass between pops, you&#39;ll get a notification.&lt;/li&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;/ul&gt;</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; &lt;h3&gt;Settings&lt;/h3&gt;</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; &lt;label for=&quot;volumeThreshold&quot;&gt;Volume Threshold: &lt;span id=&quot;thresholdValue&quot;&gt;200&lt;/span&gt;&lt;/label&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;input type=&quot;range&quot; id=&quot;volumeThreshold&quot; min=&quot;100&quot; max=&quot;255&quot; value=&quot;200&quot; onchange=&quot;updateSettings()&quot;&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp;&nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;label for=&quot;popInterval&quot;&gt;Pop Interval (seconds): &lt;span id=&quot;intervalValue&quot;&gt;2&lt;/span&gt;&lt;/label&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;input type=&quot;range&quot; id=&quot;popInterval&quot; min=&quot;1&quot; max=&quot;5&quot; value=&quot;2&quot; step=&quot;0.1&quot; onchange=&quot;updateSettings()&quot;&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp;&nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;label for=&quot;sensitivity&quot;&gt;Sensitivity (FFT Size): &lt;span id=&quot;sensitivityValue&quot;&gt;256&lt;/span&gt;&lt;/label&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;input type=&quot;range&quot; id=&quot;sensitivity&quot; min=&quot;128&quot; max=&quot;1024&quot; value=&quot;256&quot; step=&quot;128&quot; onchange=&quot;updateSettings()&quot;&gt;</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; &lt;button type=&quot;button&quot; onclick=&quot;startDetection()&quot;&gt;Start Detection&lt;/button&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;button type=&quot;button&quot; onclick=&quot;stopDetection()&quot;&gt;Stop Detection&lt;/button&gt;</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; &lt;p id=&quot;status&quot;&gt;&lt;/p&gt;<br />
+&nbsp; &nbsp; &lt;/main&gt;</p>
+
+<p>&nbsp; &nbsp; &lt;div class=&quot;container&quot;&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;h2 id=&quot;result&quot;&gt;&lt;/h2&gt;<br />
+&nbsp; &nbsp; &lt;/div&gt;</p>
+
+<p>&nbsp; &nbsp; &lt;div id=&quot;popup&quot; class=&quot;popup&quot;&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;div class=&quot;message&quot;&gt;Popcorn DONE!&lt;/div&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;button onclick=&quot;closePopup()&quot;&gt;Okay&lt;/button&gt;<br />
+&nbsp; &nbsp; &lt;/div&gt;</p>
+
+<p>&lt;/body&gt;<br />
+&lt;/html&gt;</p>
