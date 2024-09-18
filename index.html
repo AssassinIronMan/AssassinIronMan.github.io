@@ -56,6 +56,10 @@
             background-color: red;
             color: white;
         }
+        .delete-button {
+            background-color: red;
+            color: white;
+        }
         .contact-info {
             color: white;
             text-align: center;
@@ -84,6 +88,7 @@
         let timerInterval;
         let detectionStopped = true; // Default to stopped
         let remainingTime = popInterval;
+        let selectedMicId = null; // Store the selected microphone ID
 
         const defaultSettings = {
             volumeThresholdDB: -30,
@@ -111,6 +116,10 @@
                 if (c.indexOf(nameEQ) === 0) return c.substring(nameEQ.length, c.length);
             }
             return null;
+        }
+
+        function deleteCookie(name) {
+            setCookie(name, "", -1); // Set expiration date in the past
         }
 
         function loadSettings() {
@@ -158,7 +167,7 @@
             if (detectionStopped) {
                 try {
                     document.getElementById('status').textContent = "Listening...";
-                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: { deviceId: selectedMicId ? { exact: selectedMicId } : undefined } });
                     audioContext = new AudioContext();
                     microphone = audioContext.createMediaStreamSource(stream);
                     analyser = audioContext.createAnalyser();
@@ -252,29 +261,7 @@
                 audioContext.close();
                 document.getElementById('status').textContent = 'Detection stopped.';
                 detectionStopped = true;
-                clearTimeout(silenceTimeout);
                 clearInterval(timerInterval);
-                document.getElementById('timer').style.display = 'block'; // Show the timer
-                resetTimer(); // Reset timer
-                popCount = 0; // Reset pop count
-            }
-        }
-
-        function updateSettings() {
-            volumeThresholdDB = parseFloat(document.getElementById('volumeThreshold').value);
-            fftSize = parseInt(document.getElementById('sensitivity').value);
-            smoothingTimeConstant = parseFloat(document.getElementById('smoothingTimeConstant').value);
-            popInterval = parseInt(document.getElementById('popInterval').value);
-            document.getElementById('thresholdValue').textContent = volumeThresholdDB;
-            document.getElementById('sensitivityValue').textContent = fftSize;
-            document.getElementById('smoothingTimeConstantValue').textContent = smoothingTimeConstant;
-            document.getElementById('popIntervalValue').textContent = popInterval;
-            resetTimer(); // Reset timer
-            popCount = 0; // Reset pop count
-
-            if (!detectionStopped) {
-                stopDetection();
-                startDetection();
             }
         }
 
@@ -282,84 +269,132 @@
             const popup = document.getElementById('popup');
             popup.querySelector('.message').textContent = message;
             popup.style.display = 'block';
-            document.getElementById('timer').style.display = 'none'; // Hide the timer
         }
 
-        function closePopup() {
-            stopDetection(); // Ensure detection is stopped when closing the popup
+        function hidePopup() {
             document.getElementById('popup').style.display = 'none';
-            resetTimer(); // Reset timer
         }
 
         function resetTimer() {
             remainingTime = popInterval;
-            document.getElementById('timer').textContent = `Time remaining: ${remainingTime}s`;
+            document.getElementById('timer').textContent = formatTime(remainingTime);
+
             clearInterval(timerInterval);
             timerInterval = setInterval(() => {
                 remainingTime--;
-                document.getElementById('timer').textContent = `Time remaining: ${remainingTime}s`;
+                document.getElementById('timer').textContent = formatTime(remainingTime);
                 if (remainingTime <= 0) {
                     clearInterval(timerInterval);
-                    document.getElementById('timer').textContent = 'Time remaining: 0s';
                 }
             }, 1000);
         }
 
-        window.onload = function() {
-            loadSettings();
+        function formatTime(seconds) {
+            const minutes = Math.floor(seconds / 60);
+            const secs = seconds % 60;
+            return `${minutes}:${secs < 10 ? '0' : ''}${secs}`;
         }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadSettings();
+            document.getElementById('volumeThreshold').addEventListener('input', (event) => {
+                volumeThresholdDB = parseFloat(event.target.value);
+                document.getElementById('thresholdValue').textContent = volumeThresholdDB;
+            });
+
+            document.getElementById('sensitivity').addEventListener('input', (event) => {
+                fftSize = parseInt(event.target.value);
+                document.getElementById('sensitivityValue').textContent = fftSize;
+            });
+
+            document.getElementById('smoothingTimeConstant').addEventListener('input', (event) => {
+                smoothingTimeConstant = parseFloat(event.target.value);
+                document.getElementById('smoothingTimeConstantValue').textContent = smoothingTimeConstant;
+            });
+
+            document.getElementById('popInterval').addEventListener('input', (event) => {
+                popInterval = parseInt(event.target.value);
+                document.getElementById('popIntervalValue').textContent = popInterval;
+            });
+
+            document.getElementById('saveSettings').addEventListener('click', () => {
+                saveSettings();
+                showPopup('Settings saved successfully!');
+                setTimeout(hidePopup, 2000);
+            });
+
+            document.getElementById('resetSettings').addEventListener('click', () => {
+                resetSettings();
+                saveSettings(); // Save the default settings
+                showPopup('Settings reset to default.');
+                setTimeout(hidePopup, 2000);
+            });
+
+            document.getElementById('deleteCookie').addEventListener('click', () => {
+                deleteCookie('volumeThresholdDB');
+                deleteCookie('fftSize');
+                deleteCookie('smoothingTimeConstant');
+                deleteCookie('popInterval');
+                resetSettings();
+                showPopup('Settings cookie deleted.');
+                setTimeout(hidePopup, 2000);
+            });
+
+            document.getElementById('start').addEventListener('click', startDetection);
+            document.getElementById('stop').addEventListener('click', stopDetection);
+        });
     </script>
 </head>
 <body>
-
-    <main class="container">
-        <h2>Popcorn Helper</h2>
-        
-        <button type="button" onclick="startDetection()">Start Detection</button>
-        <button type="button" class="stop-button" onclick="stopDetection()">Stop Detection</button>
-
-        <p id="status"></p>
-
-        <div id="waveform">
-            <canvas id="waveformCanvas"></canvas>
-        </div>
-
-        <p id="timer">Time remaining: 2s</p>
-
-        <h3>Settings</h3>
-        <div class="setting-group">
-            <label for="volumeThreshold">Volume Threshold (dB): <span id="thresholdValue">-30</span></label>
-            <input type="range" id="volumeThreshold" min="-60" max="0" value="-30" step="1" onchange="updateSettings()">
-        </div>
-
-        <div class="setting-group">
-            <label for="sensitivity">Sensitivity (FFT Size): <span id="sensitivityValue">256</span></label>
-            <input type="range" id="sensitivity" min="128" max="1024" value="256" step="128" onchange="updateSettings()">
-        </div>
-        
-        <div class="setting-group">
-            <label for="smoothingTimeConstant">Smoothing Time Constant: <span id="smoothingTimeConstantValue">0.3</span></label>
-            <input type="range" id="smoothingTimeConstant" min="0" max="1" step="0.1" value="0.3" onchange="updateSettings()">
-        </div>
-
-        <div class="setting-group">
-            <label for="popInterval">Pop Interval (seconds): <span id="popIntervalValue">2</span></label>
-            <input type="range" id="popInterval" min="0" max="60" value="2" step="1" onchange="updateSettings()">
-        </div>
-
-        <button type="button" onclick="saveSettings()">Save Settings</button>
-        <button type="button" onclick="resetSettings()">Reset Settings</button>
-
+    <header>
+        <h1>Popcorn Pop Detection</h1>
+    </header>
+    <main>
+        <section>
+            <h2>Real-time Waveform</h2>
+            <canvas id="waveform" width="800" height="200">
+                <canvas id="waveformCanvas"></canvas>
+            </canvas>
+        </section>
+        <section>
+            <h2>Settings</h2>
+            <div class="setting-group">
+                <label for="volumeThreshold">Volume Threshold (dB):</label>
+                <input id="volumeThreshold" type="range" min="-100" max="0" step="0.1">
+                <span id="thresholdValue"></span>
+            </div>
+            <div class="setting-group">
+                <label for="sensitivity">FFT Size:</label>
+                <input id="sensitivity" type="range" min="64" max="2048" step="64">
+                <span id="sensitivityValue"></span>
+            </div>
+            <div class="setting-group">
+                <label for="smoothingTimeConstant">Smoothing Time Constant:</label>
+                <input id="smoothingTimeConstant" type="range" min="0.1" max="1" step="0.01">
+                <span id="smoothingTimeConstantValue"></span>
+            </div>
+            <div class="setting-group">
+                <label for="popInterval">Pop Interval (seconds):</label>
+                <input id="popInterval" type="number" min="1" step="1">
+                <span id="popIntervalValue"></span>
+            </div>
+            <button id="saveSettings">Save Settings</button>
+            <button id="resetSettings">Reset to Default</button>
+            <button id="deleteCookie" class="delete-button">Delete Settings Cookie</button>
+            <div id="timer">00:00</div>
+        </section>
+        <section>
+            <button id="start">Start Detection</button>
+            <button id="stop" class="stop-button">Stop Detection</button>
+            <p id="status"></p>
+        </section>
     </main>
-
     <div id="popup" class="popup">
-        <div class="message">Popcorn DONE!</div>
-        <button onclick="closePopup()">Okay</button>
+        <div class="message"></div>
+        <button onclick="hidePopup()">Close</button>
     </div>
-
-    <div class="contact-info">
-        If you want to contact me for questions, or to report a bug, or to tell me how good I did, you can email me at <a href="mailto:ironmansky123@gmail.com">ironmansky123@gmail.com</a> or add a comment to one of my <a href="https://youtube.com" class="youtube">YouTube</a> videos or send a message to me on <a href="https://discord.com" class="discord">Discord</a>. You can find my Discord server link on my <a href="https://youtube.com" class="youtube">YouTube</a> channel.
-    </div>
-
+    <footer class="contact-info">
+        <p>Contact us: <a href="https://discord.gg/example" class="discord">Discord</a> | <a href="https://youtube.com/channel/example" class="youtube">YouTube</a></p>
+    </footer>
 </body>
 </html>
