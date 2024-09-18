@@ -186,6 +186,9 @@
 
         function closePopup() {
             document.getElementById('popup').style.display = 'none';
+            // Reset detection if needed
+            detectionStopped = false;
+            startDetection();
         }
 
         function resetTimer() {
