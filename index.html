@@ -195,7 +195,7 @@
 
         function closePopup() {
             document.getElementById('popup').style.display = 'none';
-            stopDetection();
+            stopDetection(); // Stop detection
             resetTimer(); // Reset timer
         }
 
@@ -217,7 +217,7 @@
 <body>
 
     <main class="container">
-        <h2>Popcorn Pop Detection with Waveform</h2>
+        <h2>Popcorn Helper</h2>
         
         <button type="button" onclick="startDetection()">Start Detection</button>
         <button type="button" onclick="stopDetection()">Stop Detection</button>
