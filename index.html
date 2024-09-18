@@ -269,8 +269,8 @@
         }
 
         function closePopup() {
+            stopDetection(); // Ensure detection is stopped when closing the popup
             document.getElementById('popup').style.display = 'none';
-            stopDetection();
             resetTimer(); // Reset timer
         }
 
