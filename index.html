@@ -25,6 +25,10 @@
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
             z-index: 1000;
         }
+        .popup .message {
+            color: black; /* Changed text color for readability */
+            font-weight: bold;
+        }
         .popup button {
             margin-top: 10px;
         }
@@ -53,7 +57,6 @@
         let fftSize = 256;
         let smoothingTimeConstant = 0.3;
         let popCount = 0;
-        let customPopSound = new Audio();
         let silenceTimeout;
         let canvas, canvasCtx, width, height;
         let popInterval = 2; // Default pop interval in seconds
@@ -131,10 +134,6 @@
 
             if (decibels > volumeThresholdDB) {
                 popCount++;
-                if (customPopSound.src) {
-                    customPopSound.play();
-                }
-
                 if (silenceTimeout) {
                     clearTimeout(silenceTimeout);
                 }
@@ -157,6 +156,9 @@
                 audioContext.close();
                 document.getElementById('status').textContent = 'Detection stopped.';
                 detectionStopped = true;
+                clearTimeout(silenceTimeout);
+                clearInterval(timerInterval);
+                document.getElementById('timer').textContent = 'Time remaining: 2s';
             }
         }
 
@@ -170,6 +172,10 @@
             document.getElementById('sensitivityValue').textContent = fftSize;
             document.getElementById('smoothingTimeConstantValue').textContent = smoothingTimeConstant;
             document.getElementById('popIntervalValue').textContent = popInterval;
+
+            if (!detectionStopped) {
+                startDetection();
+            }
         }
 
         function showPopup(message) {
@@ -194,13 +200,6 @@
                     document.getElementById('timer').textContent = 'Time remaining: 0s';
                 }
             }, 1000);
-        }
-
-        function handleFileSelect(event) {
-            const file = event.target.files[0];
-            if (file) {
-                customPopSound.src = URL.createObjectURL(file);
-            }
         }
 
     </script>
@@ -242,17 +241,10 @@
             <input type="range" id="popInterval" min="0" max="60" value="2" step="1" onchange="updateSettings()">
         </div>
 
-        <div class="setting-group">
-            <label for="customPopSound">Upload Custom Pop Sound:</label>
-            <input type="file" id="customPopSound" accept="audio/*" onchange="handleFileSelect(event)">
-        </div>
-
     </main>
 
     <div id="popup" class="popup">
         <div class="message">Popcorn DONE!</div>
-
-
         <button onclick="closePopup()">Okay</button>
     </div>
 
