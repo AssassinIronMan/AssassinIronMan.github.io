@@ -81,6 +81,8 @@
                     visualizeWaveform();
                     detectPops();
                     detectionStopped = false; // Set to not stopped
+                    popCount = 0; // Reset pop count
+                    resetTimer(); // Reset timer
                 } catch (error) {
                     document.getElementById('status').textContent = "Error: Unable to access microphone.";
                     console.error('Error accessing microphone:', error);
@@ -162,7 +164,8 @@
                 detectionStopped = true;
                 clearTimeout(silenceTimeout);
                 clearInterval(timerInterval);
-                document.getElementById('timer').textContent = 'Time remaining: 0s'; // Reset timer display
+                resetTimer(); // Reset timer
+                popCount = 0; // Reset pop count
             }
         }
 
@@ -171,13 +174,12 @@
             fftSize = parseInt(document.getElementById('sensitivity').value);
             smoothingTimeConstant = parseFloat(document.getElementById('smoothingTimeConstant').value);
             popInterval = parseInt(document.getElementById('popInterval').value);
-            popCount = 0; // Reset pop count
-            remainingTime = popInterval;
             document.getElementById('thresholdValue').textContent = volumeThresholdDB;
             document.getElementById('sensitivityValue').textContent = fftSize;
             document.getElementById('smoothingTimeConstantValue').textContent = smoothingTimeConstant;
             document.getElementById('popIntervalValue').textContent = popInterval;
-            document.getElementById('timer').textContent = `Time remaining: ${remainingTime}s`;
+            resetTimer(); // Reset timer
+            popCount = 0; // Reset pop count
 
             if (!detectionStopped) {
                 stopDetection();
@@ -193,8 +195,8 @@
 
         function closePopup() {
             document.getElementById('popup').style.display = 'none';
-            stopDetection(); // Stop detection and reset pop count
-            resetTimer(); // Stop the timer
+            stopDetection();
+            resetTimer(); // Reset timer
         }
 
         function resetTimer() {
