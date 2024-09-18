@@ -56,10 +56,6 @@
             background-color: red;
             color: white;
         }
-        .delete-button {
-            background-color: red;
-            color: white;
-        }
         .contact-info {
             color: white;
             text-align: center;
@@ -261,6 +257,7 @@
                 audioContext.close();
                 document.getElementById('status').textContent = 'Detection stopped.';
                 detectionStopped = true;
+                clearTimeout(silenceTimeout);
                 clearInterval(timerInterval);
             }
         }
@@ -380,7 +377,7 @@
             </div>
             <button id="saveSettings">Save Settings</button>
             <button id="resetSettings">Reset to Default</button>
-            <button id="deleteCookie" class="delete-button">Delete Settings Cookie</button>
+            <button id="deleteCookie">Delete Settings Cookie</button>
             <div id="timer">00:00</div>
         </section>
         <section>
