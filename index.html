@@ -1,213 +1,226 @@
-let audioContext, microphone, analyser, dataArray, prevPopTime = 0;
-let volumeThresholdDB = -30; // Default volume threshold in decibels
-let popInterval = 2; // Default interval in seconds
-let fftSize = 256; // Default FFT size for sensitivity
-let smoothingTimeConstant = 0.3; // Default smoothing time constant
-let popCount = 0; // Track number of pops
-let isSimulating = false; // Flag to prevent multiple simulated pops
-let lastSimulatedPopTime = 0; // Track last simulated pop time
-let silenceStartTime = 0; // Track when silence starts
-let silenceDuration = 2; // Duration of silence to consider popcorn done
-let canvas, canvasCtx, width, height;
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Popcorn Pop Detection with Simulation</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css">
+    <style>
+        #status {
+            font-weight: bold;
+        }
+        .popup {
+            display: none;
+            position: fixed;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            border: 1px solid #ccc;
+            padding: 20px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+        }
+        .popup button {
+            margin-top: 10px;
+        }
+        #waveform {
+            width: 100%;
+            height: 200px;
+            background-color: #f0f0f0;
+            border: 1px solid #ccc;
+        }
+        #waveformCanvas {
+            width: 100%;
+            height: 100%;
+        }
+        .setting-group {
+            margin-bottom: 20px;
+        }
+    </style>
+    <script>
+        let audioContext, microphone, analyser, dataArray;
+        let volumeThresholdDB = -30;
+        let fftSize = 256;
+        let smoothingTimeConstant = 0.3;
+        let popCount = 0;
+        let customPopSound = new Audio();
+        let silenceTimeout;
+        let isSimulating = false;
+        let canvas, canvasCtx, width, height;
 
-async function startDetection() {
-    try {
-        document.getElementById('status').textContent = "Listening...";
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        audioContext = new AudioContext();
-        microphone = audioContext.createMediaStreamSource(stream);
-        analyser = audioContext.createAnalyser();
-        analyser.fftSize = fftSize;
-        analyser.smoothingTimeConstant = smoothingTimeConstant;
+        async function startDetection() {
+            try {
+                document.getElementById('status').textContent = "Listening...";
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                audioContext = new AudioContext();
+                microphone = audioContext.createMediaStreamSource(stream);
+                analyser = audioContext.createAnalyser();
+                analyser.fftSize = fftSize;
+                analyser.smoothingTimeConstant = smoothingTimeConstant;
 
-        dataArray = new Uint8Array(analyser.frequencyBinCount);
-        microphone.connect(analyser);
+                dataArray = new Uint8Array(analyser.frequencyBinCount);
+                microphone.connect(analyser);
 
-        // Start visualizing waveform
-        visualizeWaveform();
+                visualizeWaveform();
+                detectPops();
+            } catch (error) {
+                document.getElementById('status').textContent = "Error: Unable to access microphone.";
+                console.error('Error accessing microphone:', error);
+            }
+        }
 
-        // Start detecting pops
-        detectPops();
-    } catch (error) {
-        document.getElementById('status').textContent = "Error: Unable to access microphone.";
-        console.error('Error accessing microphone:', error);
-    }
-}
+        function visualizeWaveform() {
+            canvas = document.getElementById('waveformCanvas');
+            canvasCtx = canvas.getContext('2d');
+            width = canvas.width;
+            height = canvas.height;
 
-function visualizeWaveform() {
-    // Prepare the canvas for drawing the waveform
-    canvas = document.getElementById('waveformCanvas');
-    canvasCtx = canvas.getContext('2d');
-    width = canvas.width;
-    height = canvas.height;
+            function drawWaveform() {
+                requestAnimationFrame(drawWaveform);
+                analyser.getByteTimeDomainData(dataArray);
+                canvasCtx.fillStyle = '#f0f0f0';
+                canvasCtx.fillRect(0, 0, width, height);
+                
+                canvasCtx.lineWidth = 2;
+                canvasCtx.strokeStyle = '#007bff';
+                canvasCtx.beginPath();
 
-    function drawWaveform() {
-        requestAnimationFrame(drawWaveform);
+                const sliceWidth = width / analyser.fftSize;
+                let x = 0;
 
-        analyser.getByteTimeDomainData(dataArray);
-        canvasCtx.fillStyle = '#f0f0f0';
-        canvasCtx.fillRect(0, 0, width, height);
-        
-        canvasCtx.lineWidth = 2;
-        canvasCtx.strokeStyle = '#007bff';
-        canvasCtx.beginPath();
+                for (let i = 0; i < analyser.fftSize; i++) {
+                    const v = dataArray[i] / 128.0;
+                    const y = v * height / 2;
 
-        const sliceWidth = width / analyser.fftSize;
-        let x = 0;
+                    if (i === 0) {
+                        canvasCtx.moveTo(x, y);
+                    } else {
+                        canvasCtx.lineTo(x, y);
+                    }
 
-        for (let i = 0; i < analyser.fftSize; i++) {
-            const v = dataArray[i] / 128.0; // Normalize
-            const y = v * height / 2;
+                    x += sliceWidth;
+                }
 
-            if (i === 0) {
-                canvasCtx.moveTo(x, y);
-            } else {
-                canvasCtx.lineTo(x, y);
+                canvasCtx.lineTo(canvas.width, canvas.height / 2);
+                canvasCtx.stroke();
             }
 
-            x += sliceWidth;
+            drawWaveform();
         }
 
-        canvasCtx.lineTo(canvas.width, canvas.height / 2);
-        canvasCtx.stroke();
-    }
+        function detectPops() {
+            analyser.getByteTimeDomainData(dataArray);
+            let rms = 0;
+            for (let i = 0; i < dataArray.length; i++) {
+                rms += Math.pow(dataArray[i] - 128, 2);
+            }
+            rms = Math.sqrt(rms / dataArray.length);
+            const decibels = 20 * Math.log10(rms / 128);
 
-    drawWaveform();
-}
+            if (decibels > volumeThresholdDB) {
+                popCount++;
+                if (customPopSound.src) {
+                    customPopSound.play();
+                }
 
-function detectPops() {
-    analyser.getByteTimeDomainData(dataArray);
+                if (silenceTimeout) {
+                    clearTimeout(silenceTimeout);
+                }
 
-    // Convert raw amplitude to decibels
-    let rms = 0;
-    for (let i = 0; i < dataArray.length; i++) {
-        rms += Math.pow(dataArray[i] - 128, 2);
-    }
-    rms = Math.sqrt(rms / dataArray.length);
-    const decibels = 20 * Math.log10(rms / 128);
+                silenceTimeout = setTimeout(() => {
+                    showPopup('Popcorn DONE! Count: ' + popCount);
+                    stopDetection();
+                }, 2000);
+            }
 
-    // Check if the decibel level crosses the threshold
-    if (decibels > volumeThresholdDB) {
-        popCount++;
-        silenceStartTime = audioContext.currentTime; // Reset silence timer
-        showPopup('Pops detected: ' + popCount);
-        if (customPopSound.src) {
-            customPopSound.play();
+            requestAnimationFrame(detectPops);
         }
-    } else if (audioContext.currentTime - silenceStartTime >= silenceDuration) {
-        // If silence has lasted for the specified duration
-        showPopup('Popcorn DONE! Total Pops: ' + popCount);
-        stopDetection(); // Stop detection after showing the message
-    }
 
-    requestAnimationFrame(detectPops);
-}
-
-function stopDetection() {
-    if (audioContext) {
-        audioContext.close();
-        document.getElementById('status').textContent = 'Detection stopped.';
-    }
-}
-
-function updateSettings() {
-    volumeThresholdDB = document.getElementById('volumeThreshold').value;
-    popInterval = document.getElementById('popInterval').value;
-    fftSize = document.getElementById('sensitivity').value;
-    smoothingTimeConstant = document.getElementById('smoothingTimeConstant').value;
-    silenceDuration = document.getElementById('silenceDuration').value;
-    popCount = 0; // Reset pop count
-    document.getElementById('thresholdValue').textContent = volumeThresholdDB;
-    document.getElementById('intervalValue').textContent = popInterval;
-    document.getElementById('sensitivityValue').textContent = fftSize;
-    document.getElementById('smoothingTimeConstantValue').textContent = smoothingTimeConstant;
-    document.getElementById('silenceDurationValue').textContent = silenceDuration;
-}
-
-function showPopup(message) {
-    const popup = document.getElementById('popup');
-    popup.querySelector('.message').textContent = message;
-    popup.style.display = 'block';
-}
-
-function closePopup() {
-    document.getElementById('popup').style.display = 'none';
-}
-
-function simulatePop() {
-    const currentTime = Date.now() / 1000; // Current time in seconds
-
-    if (isSimulating || (currentTime - lastSimulatedPopTime < popInterval)) {
-        return; // Prevent simulation if it's within the interval
-    }
-
-    isSimulating = true;
-    document.getElementById('status').textContent = "Simulating Pop...";
-    
-    // Simulate a noise spike
-    const simulatedPopDuration = 0.1; // Duration of simulated noise spike
-    const simulatedPopAmplitude = 100; // Amplitude of the simulated spike
-    const simulatedPopFrequency = 440; // Frequency of simulated spike
-
-    const oscillator = audioContext.createOscillator();
-    const gainNode = audioContext.createGain();
-
-    oscillator.type = 'square'; // Use a square wave to simulate a pop
-    oscillator.frequency.setValueAtTime(simulatedPopFrequency, audioContext.currentTime);
-    oscillator.connect(gainNode);
-    gainNode.gain.setValueAtTime(simulatedPopAmplitude, audioContext.currentTime);
-    gainNode.connect(audioContext.destination);
-
-    oscillator.start();
-    setTimeout(() => {
-        oscillator.stop();
-        document.getElementById('status').textContent = "Simulated Pop Detected!";
-        showPopup('Popcorn DONE!');
-        if (customPopSound.src) {
-            customPopSound.play();
+        function stopDetection() {
+            if (audioContext) {
+                audioContext.close();
+                document.getElementById('status').textContent = 'Detection stopped.';
+            }
         }
-        isSimulating = false;
-        lastSimulatedPopTime = currentTime; // Update last simulated pop time
-    }, simulatedPopDuration * 1000); // Convert seconds to milliseconds
-}
 
-function handleFileSelect(event) {
-    const file = event.target.files[0];
-    if (file) {
-        customPopSound.src = URL.createObjectURL(file);
-    }
-}
-</script>
+        function updateSettings() {
+            volumeThresholdDB = document.getElementById('volumeThreshold').value;
+            fftSize = document.getElementById('sensitivity').value;
+            smoothingTimeConstant = document.getElementById('smoothingTimeConstant').value;
+            popCount = 0;
+            document.getElementById('thresholdValue').textContent = volumeThresholdDB;
+            document.getElementById('sensitivityValue').textContent = fftSize;
+            document.getElementById('smoothingTimeConstantValue').textContent = smoothingTimeConstant;
+        }
+
+        function showPopup(message) {
+            const popup = document.getElementById('popup');
+            popup.querySelector('.message').textContent = message;
+            popup.style.display = 'block';
+        }
+
+        function closePopup() {
+            document.getElementById('popup').style.display = 'none';
+        }
+
+        function simulatePop() {
+            if (isSimulating) return;
+
+            isSimulating = true;
+            document.getElementById('status').textContent = "Simulating Pop...";
+
+            // Create a noise spike
+            const bufferSize = audioContext.sampleRate * 0.1;
+            const buffer = audioContext.createBuffer(1, bufferSize, audioContext.sampleRate);
+            const data = buffer.getChannelData(0);
+
+            for (let i = 0; i < bufferSize; i++) {
+                data[i] = Math.random() * 2 - 1; // Random noise
+            }
+
+            const noiseSource = audioContext.createBufferSource();
+            noiseSource.buffer = buffer;
+            noiseSource.connect(audioContext.destination);
+            noiseSource.start();
+
+            setTimeout(() => {
+                document.getElementById('status').textContent = "Simulated Pop Detected!";
+                showPopup('Popcorn DONE!');
+                if (customPopSound.src) {
+                    customPopSound.play();
+                }
+                isSimulating = false;
+            }, 100); // Short delay to simulate detection without blocking
+        }
+
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (file) {
+                customPopSound.src = URL.createObjectURL(file);
+            }
+        }
+    </script>
 </head>
 <body>
 
     <main class="container">
         <h2>Popcorn Pop Detection with Waveform and Simulation</h2>
         
-        <!-- Start and Stop Buttons -->
         <button type="button" onclick="startDetection()">Start Detection</button>
         <button type="button" onclick="stopDetection()">Stop Detection</button>
-
-        <!-- Simulate Pop Button -->
         <button type="button" onclick="simulatePop()">Simulate Pop</button>
 
         <p id="status"></p>
 
-        <!-- Waveform Display -->
         <div id="waveform">
             <canvas id="waveformCanvas"></canvas>
         </div>
 
-        <!-- Settings Section -->
         <h3>Settings</h3>
         <div class="setting-group">
             <label for="volumeThreshold">Volume Threshold (dB): <span id="thresholdValue">-30</span></label>
             <input type="range" id="volumeThreshold" min="-60" max="0" value="-30" onchange="updateSettings()">
-        </div>
-
-        <div class="setting-group">
-            <label for="popInterval">Pop Interval (seconds): <span id="intervalValue">2</span></label>
-            <input type="range" id="popInterval" min="1" max="5" value="2" step="0.1" onchange="updateSettings()">
         </div>
 
         <div class="setting-group">
@@ -217,14 +230,7 @@ function handleFileSelect(event) {
         
         <div class="setting-group">
             <label for="smoothingTimeConstant">Smoothing Time Constant: <span id="smoothingTimeConstantValue">0.3</span></label>
-            <input type="range" id="smoothingTimeConstant" min="0" max="1" step="0.1" value="0.3" onchange="
-
-updateSettings()">
-        </div>
-
-        <div class="setting-group">
-            <label for="silenceDuration">Silence Duration (seconds): <span id="silenceDurationValue">2</span></label>
-            <input type="range" id="silenceDuration" min="1" max="10" value="2" step="0.1" onchange="updateSettings()">
+            <input type="range" id="smoothingTimeConstant" min="0" max="1" step="0.1" value="0.3" onchange="updateSettings()">
         </div>
 
         <div class="setting-group">
@@ -234,7 +240,6 @@ updateSettings()">
 
     </main>
 
-    <!-- Pop-up modal -->
     <div id="popup" class="popup">
         <div class="message">Popcorn DONE!</div>
         <button onclick="closePopup()">Okay</button>
