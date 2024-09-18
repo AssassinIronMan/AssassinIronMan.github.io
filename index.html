@@ -25,25 +25,14 @@
             margin-top: 10px;
         }
         #waveform {
-            width: 80%;
+            width: 100%;
             height: 200px;
             background-color: #f0f0f0;
             border: 1px solid #ccc;
-            position: relative;
         }
         #waveformCanvas {
             width: 100%;
             height: 100%;
-        }
-        #timer {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            background: #fff;
-            padding: 5px;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-            font-weight: bold;
         }
         .setting-group {
             margin-bottom: 20px;
@@ -52,15 +41,13 @@
     <script>
         let audioContext, microphone, analyser, dataArray;
         let volumeThresholdDB = -30;
-        let popInterval = 2;
         let fftSize = 256;
         let smoothingTimeConstant = 0.3;
         let popCount = 0;
         let customPopSound = new Audio();
         let silenceTimeout;
-        let lastPopTime = 0;
+        let isSimulating = false;
         let canvas, canvasCtx, width, height;
-        let timerInterval;
 
         async function startDetection() {
             try {
@@ -132,24 +119,19 @@
             const decibels = 20 * Math.log10(rms / 128);
 
             if (decibels > volumeThresholdDB) {
-                const currentTime = audioContext.currentTime;
-                if (currentTime - lastPopTime >= popInterval) {
-                    popCount++;
-                    updateTimer();
-                    if (customPopSound.src) {
-                        customPopSound.play();
-                    }
-
-                    if (silenceTimeout) {
-                        clearTimeout(silenceTimeout);
-                    }
-
-                    silenceTimeout = setTimeout(() => {
-                        showPopup('Popcorn DONE! Count: ' + popCount);
-                        stopDetection();
-                    }, 2000);
+                popCount++;
+                if (customPopSound.src) {
+                    customPopSound.play();
                 }
-                lastPopTime = currentTime;
+
+                if (silenceTimeout) {
+                    clearTimeout(silenceTimeout);
+                }
+
+                silenceTimeout = setTimeout(() => {
+                    showPopup('Popcorn DONE! Count: ' + popCount);
+                    stopDetection();
+                }, 2000);
             }
 
             requestAnimationFrame(detectPops);
@@ -159,20 +141,15 @@
             if (audioContext) {
                 audioContext.close();
                 document.getElementById('status').textContent = 'Detection stopped.';
-                if (timerInterval) {
-                    clearInterval(timerInterval);
-                }
             }
         }
 
         function updateSettings() {
             volumeThresholdDB = document.getElementById('volumeThreshold').value;
-            popInterval = document.getElementById('popInterval').value;
             fftSize = document.getElementById('sensitivity').value;
             smoothingTimeConstant = document.getElementById('smoothingTimeConstant').value;
             popCount = 0;
             document.getElementById('thresholdValue').textContent = volumeThresholdDB;
-            document.getElementById('intervalValue').textContent = popInterval;
             document.getElementById('sensitivityValue').textContent = fftSize;
             document.getElementById('smoothingTimeConstantValue').textContent = smoothingTimeConstant;
         }
@@ -188,12 +165,18 @@
         }
 
         function simulatePop() {
+            if (isSimulating) return;
+
+            isSimulating = true;
+            document.getElementById('status').textContent = "Simulating Pop...";
+
+            // Create a noise spike
             const bufferSize = audioContext.sampleRate * 0.1;
             const buffer = audioContext.createBuffer(1, bufferSize, audioContext.sampleRate);
             const data = buffer.getChannelData(0);
 
             for (let i = 0; i < bufferSize; i++) {
-                data[i] = Math.random() * 2 - 1;
+                data[i] = Math.random() * 2 - 1; // Random noise
             }
 
             const noiseSource = audioContext.createBufferSource();
@@ -201,41 +184,14 @@
             noiseSource.connect(audioContext.destination);
             noiseSource.start();
 
-            document.getElementById('status').textContent = "Simulating Pop...";
             setTimeout(() => {
                 document.getElementById('status').textContent = "Simulated Pop Detected!";
+                showPopup('Popcorn DONE!');
                 if (customPopSound.src) {
                     customPopSound.play();
                 }
-                // Prevent immediate Popcorn DONE message
-                if (silenceTimeout) {
-                    clearTimeout(silenceTimeout);
-                }
-                silenceTimeout = setTimeout(() => {
-                    showPopup('Popcorn DONE! Count: ' + popCount);
-                    stopDetection();
-                }, 2000);
-            }, 100);
-        }
-
-        function updateTimer() {
-            const timerDisplay = document.getElementById('timer');
-            let seconds = 2;
-
-            function update() {
-                if (seconds <= 0) {
-                    clearInterval(timerInterval);
-                } else {
-                    timerDisplay.textContent = `Timer: ${seconds}s`;
-                    seconds--;
-                }
-            }
-
-            if (timerInterval) {
-                clearInterval(timerInterval);
-            }
-
-            timerInterval = setInterval(update, 1000);
+                isSimulating = false;
+            }, 100); // Short delay to simulate detection without blocking
         }
 
         function handleFileSelect(event) {
@@ -259,20 +215,12 @@
 
         <div id="waveform">
             <canvas id="waveformCanvas"></canvas>
-            <div id="timer">Timer: 2s</div>
         </div>
 
         <h3>Settings</h3>
         <div class="setting-group">
             <label for="volumeThreshold">Volume Threshold (dB): <span id="thresholdValue">-30</span></label>
             <input type="range" id="volumeThreshold" min="-60" max="0" value="-30" onchange="updateSettings()">
-        </div>
-
-        <
-
-div class="setting-group">
-            <label for="popInterval">Pop Interval (seconds): <span id="intervalValue">2</span></label>
-            <input type="range" id="popInterval" min="0" max="60" value="2" step="0.1" onchange="updateSettings()">
         </div>
 
         <div class="setting-group">
