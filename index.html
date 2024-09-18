@@ -162,6 +162,7 @@
                 detectionStopped = true;
                 clearTimeout(silenceTimeout);
                 clearInterval(timerInterval);
+                document.getElementById('timer').textContent = 'Time remaining: 0s'; // Reset timer display
             }
         }
 
@@ -170,7 +171,7 @@
             fftSize = parseInt(document.getElementById('sensitivity').value);
             smoothingTimeConstant = parseFloat(document.getElementById('smoothingTimeConstant').value);
             popInterval = parseInt(document.getElementById('popInterval').value);
-            popCount = 0;
+            popCount = 0; // Reset pop count
             remainingTime = popInterval;
             document.getElementById('thresholdValue').textContent = volumeThresholdDB;
             document.getElementById('sensitivityValue').textContent = fftSize;
@@ -192,8 +193,8 @@
 
         function closePopup() {
             document.getElementById('popup').style.display = 'none';
-            stopDetection();
-            resetTimer();
+            stopDetection(); // Stop detection and reset pop count
+            resetTimer(); // Stop the timer
         }
 
         function resetTimer() {
