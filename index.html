@@ -50,6 +50,10 @@
             font-weight: bold;
             margin-top: 10px;
         }
+        .stop-button {
+            background-color: red;
+            color: white;
+        }
     </style>
     <script>
         let audioContext, microphone, analyser, dataArray;
@@ -63,6 +67,13 @@
         let timerInterval;
         let detectionStopped = true; // Default to stopped
         let remainingTime = popInterval;
+
+        const defaultSettings = {
+            volumeThresholdDB: -30,
+            fftSize: 256,
+            smoothingTimeConstant: 0.3,
+            popInterval: 2
+        };
 
         function setCookie(name, value, days) {
             let expires = "";
@@ -86,10 +97,10 @@
         }
 
         function loadSettings() {
-            volumeThresholdDB = parseFloat(getCookie('volumeThresholdDB')) || -30;
-            fftSize = parseInt(getCookie('fftSize')) || 256;
-            smoothingTimeConstant = parseFloat(getCookie('smoothingTimeConstant')) || 0.3;
-            popInterval = parseInt(getCookie('popInterval')) || 2;
+            volumeThresholdDB = parseFloat(getCookie('volumeThresholdDB')) || defaultSettings.volumeThresholdDB;
+            fftSize = parseInt(getCookie('fftSize')) || defaultSettings.fftSize;
+            smoothingTimeConstant = parseFloat(getCookie('smoothingTimeConstant')) || defaultSettings.smoothingTimeConstant;
+            popInterval = parseInt(getCookie('popInterval')) || defaultSettings.popInterval;
 
             document.getElementById('volumeThreshold').value = volumeThresholdDB;
             document.getElementById('sensitivity').value = fftSize;
@@ -107,6 +118,23 @@
             setCookie('fftSize', fftSize, 7);
             setCookie('smoothingTimeConstant', smoothingTimeConstant, 7);
             setCookie('popInterval', popInterval, 7);
+        }
+
+        function resetSettings() {
+            volumeThresholdDB = defaultSettings.volumeThresholdDB;
+            fftSize = defaultSettings.fftSize;
+            smoothingTimeConstant = defaultSettings.smoothingTimeConstant;
+            popInterval = defaultSettings.popInterval;
+
+            document.getElementById('volumeThreshold').value = volumeThresholdDB;
+            document.getElementById('sensitivity').value = fftSize;
+            document.getElementById('smoothingTimeConstant').value = smoothingTimeConstant;
+            document.getElementById('popInterval').value = popInterval;
+
+            document.getElementById('thresholdValue').textContent = volumeThresholdDB;
+            document.getElementById('sensitivityValue').textContent = fftSize;
+            document.getElementById('smoothingTimeConstantValue').textContent = smoothingTimeConstant;
+            document.getElementById('popIntervalValue').textContent = popInterval;
         }
 
         async function startDetection() {
@@ -271,7 +299,7 @@
         <h2>Popcorn Helper</h2>
         
         <button type="button" onclick="startDetection()">Start Detection</button>
-        <button type="button" onclick="stopDetection()">Stop Detection</button>
+        <button type="button" class="stop-button" onclick="stopDetection()">Stop Detection</button>
 
         <p id="status"></p>
 
@@ -303,6 +331,7 @@
         </div>
 
         <button type="button" onclick="saveSettings()">Save Settings</button>
+        <button type="button" onclick="resetSettings()">Reset Settings</button>
 
     </main>
 
