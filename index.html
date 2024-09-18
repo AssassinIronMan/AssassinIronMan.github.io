@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Popcorn Pop Detection with Simulation</title>
+    <title>Popcorn Pop Detection</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css">
     <style>
         body {
@@ -55,10 +55,10 @@
         let popCount = 0;
         let customPopSound = new Audio();
         let silenceTimeout;
-        let isSimulating = false;
         let canvas, canvasCtx, width, height;
         let popInterval = 2; // Default pop interval in seconds
         let timerInterval;
+        let detectionStopped = false;
 
         async function startDetection() {
             try {
@@ -139,9 +139,13 @@
                     clearTimeout(silenceTimeout);
                 }
 
+                resetTimer();
+
                 silenceTimeout = setTimeout(() => {
-                    showPopup('Popcorn DONE! Count: ' + popCount);
-                    stopDetection();
+                    if (!detectionStopped) {
+                        showPopup('Popcorn DONE! Count: ' + popCount);
+                        stopDetection();
+                    }
                 }, popInterval * 1000); // Using popInterval
             }
 
@@ -152,6 +156,7 @@
             if (audioContext) {
                 audioContext.close();
                 document.getElementById('status').textContent = 'Detection stopped.';
+                detectionStopped = true;
             }
         }
 
@@ -177,47 +182,10 @@
             document.getElementById('popup').style.display = 'none';
         }
 
-        function simulatePop() {
-            if (isSimulating) return;
-
-            isSimulating = true;
-            document.getElementById('status').textContent = "Simulating Pop...";
-
-            // Create a noise spike
-            const bufferSize = audioContext.sampleRate * 0.1;
-            const buffer = audioContext.createBuffer(1, bufferSize, audioContext.sampleRate);
-            const data = buffer.getChannelData(0);
-
-            for (let i = 0; i < bufferSize; i++) {
-                data[i] = Math.random() * 2 - 1; // Random noise
-            }
-
-            const noiseSource = audioContext.createBufferSource();
-            noiseSource.buffer = buffer;
-            noiseSource.connect(audioContext.destination);
-            noiseSource.start();
-
-            clearTimeout(timerInterval); // Reset timer
-
-            document.getElementById('status').textContent = "Simulated Pop Detected!";
-            showPopup('Popcorn DONE!');
-            if (customPopSound.src) {
-                customPopSound.play();
-            }
-
-            isSimulating = false;
-        }
-
-        function handleFileSelect(event) {
-            const file = event.target.files[0];
-            if (file) {
-                customPopSound.src = URL.createObjectURL(file);
-            }
-        }
-
-        function updateTimer() {
+        function resetTimer() {
             let seconds = 2;
             document.getElementById('timer').textContent = `Time remaining: ${seconds}s`;
+            clearInterval(timerInterval);
             timerInterval = setInterval(() => {
                 seconds--;
                 document.getElementById('timer').textContent = `Time remaining: ${seconds}s`;
@@ -228,16 +196,22 @@
             }, 1000);
         }
 
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (file) {
+                customPopSound.src = URL.createObjectURL(file);
+            }
+        }
+
     </script>
 </head>
 <body>
 
     <main class="container">
-        <h2>Popcorn Pop Detection with Waveform and Simulation</h2>
+        <h2>Popcorn Pop Detection with Waveform</h2>
         
         <button type="button" onclick="startDetection()">Start Detection</button>
         <button type="button" onclick="stopDetection()">Stop Detection</button>
-        <button type="button" onclick="simulatePop()">Simulate Pop</button>
 
         <p id="status"></p>
 
@@ -277,6 +251,8 @@
 
     <div id="popup" class="popup">
         <div class="message">Popcorn DONE!</div>
+
+
         <button onclick="closePopup()">Okay</button>
     </div>
 
