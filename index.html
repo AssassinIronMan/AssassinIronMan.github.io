@@ -164,7 +164,6 @@
                 detectionStopped = true;
                 clearTimeout(silenceTimeout);
                 clearInterval(timerInterval);
-                resetTimer(); // Reset timer
                 popCount = 0; // Reset pop count
             }
         }
@@ -195,8 +194,10 @@
 
         function closePopup() {
             document.getElementById('popup').style.display = 'none';
-            stopDetection(); // Stop detection
             resetTimer(); // Reset timer
+            if (detectionStopped) {
+                startDetection(); // Restart detection if stopped
+            }
         }
 
         function resetTimer() {
