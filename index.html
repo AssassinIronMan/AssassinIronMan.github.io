@@ -64,6 +64,51 @@
         let detectionStopped = true; // Default to stopped
         let remainingTime = popInterval;
 
+        function setCookie(name, value, days) {
+            let expires = "";
+            if (days) {
+                const date = new Date();
+                date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+                expires = "; expires=" + date.toUTCString();
+            }
+            document.cookie = name + "=" + (value || "") + expires + "; path=/";
+        }
+
+        function getCookie(name) {
+            const nameEQ = name + "=";
+            const ca = document.cookie.split(';');
+            for (let i = 0; i < ca.length; i++) {
+                let c = ca[i];
+                while (c.charAt(0) === ' ') c = c.substring(1, c.length);
+                if (c.indexOf(nameEQ) === 0) return c.substring(nameEQ.length, c.length);
+            }
+            return null;
+        }
+
+        function loadSettings() {
+            volumeThresholdDB = parseFloat(getCookie('volumeThresholdDB')) || -30;
+            fftSize = parseInt(getCookie('fftSize')) || 256;
+            smoothingTimeConstant = parseFloat(getCookie('smoothingTimeConstant')) || 0.3;
+            popInterval = parseInt(getCookie('popInterval')) || 2;
+
+            document.getElementById('volumeThreshold').value = volumeThresholdDB;
+            document.getElementById('sensitivity').value = fftSize;
+            document.getElementById('smoothingTimeConstant').value = smoothingTimeConstant;
+            document.getElementById('popInterval').value = popInterval;
+
+            document.getElementById('thresholdValue').textContent = volumeThresholdDB;
+            document.getElementById('sensitivityValue').textContent = fftSize;
+            document.getElementById('smoothingTimeConstantValue').textContent = smoothingTimeConstant;
+            document.getElementById('popIntervalValue').textContent = popInterval;
+        }
+
+        function saveSettings() {
+            setCookie('volumeThresholdDB', volumeThresholdDB, 7);
+            setCookie('fftSize', fftSize, 7);
+            setCookie('smoothingTimeConstant', smoothingTimeConstant, 7);
+            setCookie('popInterval', popInterval, 7);
+        }
+
         async function startDetection() {
             if (detectionStopped) {
                 try {
@@ -164,6 +209,8 @@
                 detectionStopped = true;
                 clearTimeout(silenceTimeout);
                 clearInterval(timerInterval);
+                document.getElementById('timer').style.display = 'block'; // Show the timer
+                resetTimer(); // Reset timer
                 popCount = 0; // Reset pop count
             }
         }
@@ -190,14 +237,13 @@
             const popup = document.getElementById('popup');
             popup.querySelector('.message').textContent = message;
             popup.style.display = 'block';
+            document.getElementById('timer').style.display = 'none'; // Hide the timer
         }
 
         function closePopup() {
             document.getElementById('popup').style.display = 'none';
+            stopDetection();
             resetTimer(); // Reset timer
-            if (detectionStopped) {
-                startDetection(); // Restart detection if stopped
-            }
         }
 
         function resetTimer() {
@@ -214,40 +260,9 @@
             }, 1000);
         }
 
-        function saveSettings() {
-            const settings = {
-                volumeThresholdDB,
-                fftSize,
-                smoothingTimeConstant,
-                popInterval
-            };
-            localStorage.setItem('popcornSettings', JSON.stringify(settings));
-            alert('Settings saved!');
+        window.onload = function() {
+            loadSettings();
         }
-
-        function loadSettings() {
-            const savedSettings = localStorage.getItem('popcornSettings');
-            if (savedSettings) {
-                const settings = JSON.parse(savedSettings);
-                volumeThresholdDB = settings.volumeThresholdDB;
-                fftSize = settings.fftSize;
-                smoothingTimeConstant = settings.smoothingTimeConstant;
-                popInterval = settings.popInterval;
-
-                document.getElementById('volumeThreshold').value = volumeThresholdDB;
-                document.getElementById('sensitivity').value = fftSize;
-                document.getElementById('smoothingTimeConstant').value = smoothingTimeConstant;
-                document.getElementById('popInterval').value = popInterval;
-
-                document.getElementById('thresholdValue').textContent = volumeThresholdDB;
-                document.getElementById('sensitivityValue').textContent = fftSize;
-                document.getElementById('smoothingTimeConstantValue').textContent = smoothingTimeConstant;
-                document.getElementById('popIntervalValue').textContent = popInterval;
-            }
-        }
-
-        // Load settings on page load
-        window.onload = loadSettings;
     </script>
 </head>
 <body>
@@ -257,7 +272,6 @@
         
         <button type="button" onclick="startDetection()">Start Detection</button>
         <button type="button" onclick="stopDetection()">Stop Detection</button>
-        <button type="button" onclick="saveSettings()">Save Settings</button>
 
         <p id="status"></p>
 
@@ -287,6 +301,8 @@
             <label for="popInterval">Pop Interval (seconds): <span id="popIntervalValue">2</span></label>
             <input type="range" id="popInterval" min="0" max="60" value="2" step="1" onchange="updateSettings()">
         </div>
+
+        <button type="button" onclick="saveSettings()">Save Settings</button>
 
     </main>
 
