@@ -62,6 +62,7 @@
         let popInterval = 2; // Default pop interval in seconds
         let timerInterval;
         let detectionStopped = false;
+        let remainingTime = 2;
 
         async function startDetection() {
             try {
@@ -158,7 +159,7 @@
                 detectionStopped = true;
                 clearTimeout(silenceTimeout);
                 clearInterval(timerInterval);
-                document.getElementById('timer').textContent = 'Time remaining: 2s';
+                document.getElementById('timer').textContent = `Time remaining: ${remainingTime}s`;
             }
         }
 
@@ -168,6 +169,7 @@
             smoothingTimeConstant = document.getElementById('smoothingTimeConstant').value;
             popInterval = document.getElementById('popInterval').value;
             popCount = 0;
+            remainingTime = popInterval;
             document.getElementById('thresholdValue').textContent = volumeThresholdDB;
             document.getElementById('sensitivityValue').textContent = fftSize;
             document.getElementById('smoothingTimeConstantValue').textContent = smoothingTimeConstant;
@@ -186,19 +188,17 @@
 
         function closePopup() {
             document.getElementById('popup').style.display = 'none';
-            // Reset detection if needed
-            detectionStopped = false;
-            startDetection();
+            stopDetection();
+            resetTimer();
         }
 
         function resetTimer() {
-            let seconds = 2;
-            document.getElementById('timer').textContent = `Time remaining: ${seconds}s`;
+            document.getElementById('timer').textContent = `Time remaining: ${remainingTime}s`;
             clearInterval(timerInterval);
             timerInterval = setInterval(() => {
-                seconds--;
-                document.getElementById('timer').textContent = `Time remaining: ${seconds}s`;
-                if (seconds <= 0) {
+                remainingTime--;
+                document.getElementById('timer').textContent = `Time remaining: ${remainingTime}s`;
+                if (remainingTime <= 0) {
                     clearInterval(timerInterval);
                     document.getElementById('timer').textContent = 'Time remaining: 0s';
                 }
