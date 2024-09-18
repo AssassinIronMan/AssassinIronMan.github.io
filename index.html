@@ -65,30 +65,28 @@
         let remainingTime = popInterval;
 
         async function startDetection() {
-            if (audioContext) {
-                await audioContext.close(); // Close previous AudioContext if it exists
-            }
-            
-            try {
-                document.getElementById('status').textContent = "Listening...";
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                audioContext = new AudioContext();
-                microphone = audioContext.createMediaStreamSource(stream);
-                analyser = audioContext.createAnalyser();
-                analyser.fftSize = fftSize;
-                analyser.smoothingTimeConstant = smoothingTimeConstant;
+            if (detectionStopped) {
+                try {
+                    document.getElementById('status').textContent = "Listening...";
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    audioContext = new AudioContext();
+                    microphone = audioContext.createMediaStreamSource(stream);
+                    analyser = audioContext.createAnalyser();
+                    analyser.fftSize = fftSize;
+                    analyser.smoothingTimeConstant = smoothingTimeConstant;
 
-                dataArray = new Uint8Array(analyser.frequencyBinCount);
-                microphone.connect(analyser);
+                    dataArray = new Uint8Array(analyser.frequencyBinCount);
+                    microphone.connect(analyser);
 
-                visualizeWaveform();
-                detectPops();
-                detectionStopped = false; // Set to not stopped
-                popCount = 0; // Reset pop count
-                resetTimer(); // Reset timer
-            } catch (error) {
-                document.getElementById('status').textContent = "Error: Unable to access microphone.";
-                console.error('Error accessing microphone:', error);
+                    visualizeWaveform();
+                    detectPops();
+                    detectionStopped = false; // Set to not stopped
+                    popCount = 0; // Reset pop count
+                    resetTimer(); // Reset timer
+                } catch (error) {
+                    document.getElementById('status').textContent = "Error: Unable to access microphone.";
+                    console.error('Error accessing microphone:', error);
+                }
             }
         }
 
