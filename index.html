@@ -6,6 +6,10 @@
     <title>Popcorn Pop Detection with Simulation</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css">
     <style>
+        body {
+            background-color: black;
+            color: white;
+        }
         #status {
             font-weight: bold;
         }
@@ -27,7 +31,7 @@
         #waveform {
             width: 100%;
             height: 200px;
-            background-color: #f0f0f0;
+            background-color: black;
             border: 1px solid #ccc;
         }
         #waveformCanvas {
@@ -36,6 +40,11 @@
         }
         .setting-group {
             margin-bottom: 20px;
+        }
+        #timer {
+            color: white;
+            font-weight: bold;
+            margin-top: 10px;
         }
     </style>
     <script>
@@ -48,6 +57,8 @@
         let silenceTimeout;
         let isSimulating = false;
         let canvas, canvasCtx, width, height;
+        let popInterval = 2; // Default pop interval in seconds
+        let timerInterval;
 
         async function startDetection() {
             try {
@@ -79,7 +90,7 @@
             function drawWaveform() {
                 requestAnimationFrame(drawWaveform);
                 analyser.getByteTimeDomainData(dataArray);
-                canvasCtx.fillStyle = '#f0f0f0';
+                canvasCtx.fillStyle = 'black';
                 canvasCtx.fillRect(0, 0, width, height);
                 
                 canvasCtx.lineWidth = 2;
@@ -131,7 +142,7 @@
                 silenceTimeout = setTimeout(() => {
                     showPopup('Popcorn DONE! Count: ' + popCount);
                     stopDetection();
-                }, 2000);
+                }, popInterval * 1000); // Using popInterval
             }
 
             requestAnimationFrame(detectPops);
@@ -148,10 +159,12 @@
             volumeThresholdDB = document.getElementById('volumeThreshold').value;
             fftSize = document.getElementById('sensitivity').value;
             smoothingTimeConstant = document.getElementById('smoothingTimeConstant').value;
+            popInterval = document.getElementById('popInterval').value;
             popCount = 0;
             document.getElementById('thresholdValue').textContent = volumeThresholdDB;
             document.getElementById('sensitivityValue').textContent = fftSize;
             document.getElementById('smoothingTimeConstantValue').textContent = smoothingTimeConstant;
+            document.getElementById('popIntervalValue').textContent = popInterval;
         }
 
         function showPopup(message) {
@@ -184,14 +197,15 @@
             noiseSource.connect(audioContext.destination);
             noiseSource.start();
 
-            setTimeout(() => {
-                document.getElementById('status').textContent = "Simulated Pop Detected!";
-                showPopup('Popcorn DONE!');
-                if (customPopSound.src) {
-                    customPopSound.play();
-                }
-                isSimulating = false;
-            }, 100); // Short delay to simulate detection without blocking
+            clearTimeout(timerInterval); // Reset timer
+
+            document.getElementById('status').textContent = "Simulated Pop Detected!";
+            showPopup('Popcorn DONE!');
+            if (customPopSound.src) {
+                customPopSound.play();
+            }
+
+            isSimulating = false;
         }
 
         function handleFileSelect(event) {
@@ -200,6 +214,20 @@
                 customPopSound.src = URL.createObjectURL(file);
             }
         }
+
+        function updateTimer() {
+            let seconds = 2;
+            document.getElementById('timer').textContent = `Time remaining: ${seconds}s`;
+            timerInterval = setInterval(() => {
+                seconds--;
+                document.getElementById('timer').textContent = `Time remaining: ${seconds}s`;
+                if (seconds <= 0) {
+                    clearInterval(timerInterval);
+                    document.getElementById('timer').textContent = 'Time remaining: 0s';
+                }
+            }, 1000);
+        }
+
     </script>
 </head>
 <body>
@@ -217,6 +245,8 @@
             <canvas id="waveformCanvas"></canvas>
         </div>
 
+        <p id="timer">Time remaining: 2s</p>
+
         <h3>Settings</h3>
         <div class="setting-group">
             <label for="volumeThreshold">Volume Threshold (dB): <span id="thresholdValue">-30</span></label>
@@ -231,6 +261,11 @@
         <div class="setting-group">
             <label for="smoothingTimeConstant">Smoothing Time Constant: <span id="smoothingTimeConstantValue">0.3</span></label>
             <input type="range" id="smoothingTimeConstant" min="0" max="1" step="0.1" value="0.3" onchange="updateSettings()">
+        </div>
+
+        <div class="setting-group">
+            <label for="popInterval">Pop Interval (seconds): <span id="popIntervalValue">2</span></label>
+            <input type="range" id="popInterval" min="0" max="60" value="2" step="1" onchange="updateSettings()">
         </div>
 
         <div class="setting-group">
