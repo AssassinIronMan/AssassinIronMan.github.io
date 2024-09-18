@@ -95,17 +95,15 @@
 
     <main class="container">
         <h2>Popcorn Pop Detection</h2>
-        <p>Press "Start Detection" to begin analyzing the sound and detecting popcorn pops. Customize the settings below:</p>
+        
+        <!-- Start and Stop Buttons -->
+        <button type="button" onclick="startDetection()">Start Detection</button>
+        <button type="button" onclick="stopDetection()">Stop Detection</button>
 
-        <p>Instructions:</p>
-        <ul>
-            <li>Allow the site to use your microphone.</li>
-            <li>Adjust settings as needed.</li>
-            <li>When 2 seconds (or your selected interval) pass between pops, you'll get a notification.</li>
-        </ul>
+        <p id="status"></p>
 
+        <!-- Settings Section -->
         <h3>Settings</h3>
-
         <label for="volumeThreshold">Volume Threshold: <span id="thresholdValue">200</span></label>
         <input type="range" id="volumeThreshold" min="100" max="255" value="200" onchange="updateSettings()">
         
@@ -115,16 +113,20 @@
         <label for="sensitivity">Sensitivity (FFT Size): <span id="sensitivityValue">256</span></label>
         <input type="range" id="sensitivity" min="128" max="1024" value="256" step="128" onchange="updateSettings()">
 
-        <button type="button" onclick="startDetection()">Start Detection</button>
-        <button type="button" onclick="stopDetection()">Stop Detection</button>
-
-        <p id="status"></p>
+        <!-- Instructions Section -->
+        <h3>Instructions</h3>
+        <ul>
+            <li>Allow the site to use your microphone.</li>
+            <li>Adjust settings as needed.</li>
+            <li>When the selected interval passes between pops, you'll get a notification.</li>
+        </ul>
     </main>
 
     <div class="container">
         <h2 id="result"></h2>
     </div>
 
+    <!-- Pop-up modal -->
     <div id="popup" class="popup">
         <div class="message">Popcorn DONE!</div>
         <button onclick="closePopup()">Okay</button>
