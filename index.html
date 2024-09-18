@@ -61,27 +61,30 @@
         let canvas, canvasCtx, width, height;
         let popInterval = 2; // Default pop interval in seconds
         let timerInterval;
-        let detectionStopped = false;
+        let detectionStopped = true; // Default to stopped
         let remainingTime = popInterval;
 
         async function startDetection() {
-            try {
-                document.getElementById('status').textContent = "Listening...";
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                audioContext = new AudioContext();
-                microphone = audioContext.createMediaStreamSource(stream);
-                analyser = audioContext.createAnalyser();
-                analyser.fftSize = fftSize;
-                analyser.smoothingTimeConstant = smoothingTimeConstant;
+            if (detectionStopped) {
+                try {
+                    document.getElementById('status').textContent = "Listening...";
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    audioContext = new AudioContext();
+                    microphone = audioContext.createMediaStreamSource(stream);
+                    analyser = audioContext.createAnalyser();
+                    analyser.fftSize = fftSize;
+                    analyser.smoothingTimeConstant = smoothingTimeConstant;
 
-                dataArray = new Uint8Array(analyser.frequencyBinCount);
-                microphone.connect(analyser);
+                    dataArray = new Uint8Array(analyser.frequencyBinCount);
+                    microphone.connect(analyser);
 
-                visualizeWaveform();
-                detectPops();
-            } catch (error) {
-                document.getElementById('status').textContent = "Error: Unable to access microphone.";
-                console.error('Error accessing microphone:', error);
+                    visualizeWaveform();
+                    detectPops();
+                    detectionStopped = false; // Set to not stopped
+                } catch (error) {
+                    document.getElementById('status').textContent = "Error: Unable to access microphone.";
+                    console.error('Error accessing microphone:', error);
+                }
             }
         }
 
@@ -163,18 +166,20 @@
         }
 
         function updateSettings() {
-            volumeThresholdDB = document.getElementById('volumeThreshold').value;
-            fftSize = document.getElementById('sensitivity').value;
-            smoothingTimeConstant = document.getElementById('smoothingTimeConstant').value;
-            popInterval = document.getElementById('popInterval').value;
+            volumeThresholdDB = parseFloat(document.getElementById('volumeThreshold').value);
+            fftSize = parseInt(document.getElementById('sensitivity').value);
+            smoothingTimeConstant = parseFloat(document.getElementById('smoothingTimeConstant').value);
+            popInterval = parseInt(document.getElementById('popInterval').value);
             popCount = 0;
             remainingTime = popInterval;
             document.getElementById('thresholdValue').textContent = volumeThresholdDB;
             document.getElementById('sensitivityValue').textContent = fftSize;
             document.getElementById('smoothingTimeConstantValue').textContent = smoothingTimeConstant;
             document.getElementById('popIntervalValue').textContent = popInterval;
+            document.getElementById('timer').textContent = `Time remaining: ${remainingTime}s`;
 
             if (!detectionStopped) {
+                stopDetection();
                 startDetection();
             }
         }
@@ -225,7 +230,7 @@
         <h3>Settings</h3>
         <div class="setting-group">
             <label for="volumeThreshold">Volume Threshold (dB): <span id="thresholdValue">-30</span></label>
-            <input type="range" id="volumeThreshold" min="-60" max="0" value="-30" onchange="updateSettings()">
+            <input type="range" id="volumeThreshold" min="-60" max="0" value="-30" step="1" onchange="updateSettings()">
         </div>
 
         <div class="setting-group">
