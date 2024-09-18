@@ -62,7 +62,7 @@
         let popInterval = 2; // Default pop interval in seconds
         let timerInterval;
         let detectionStopped = false;
-        let remainingTime = 2;
+        let remainingTime = popInterval;
 
         async function startDetection() {
             try {
@@ -159,7 +159,6 @@
                 detectionStopped = true;
                 clearTimeout(silenceTimeout);
                 clearInterval(timerInterval);
-                document.getElementById('timer').textContent = `Time remaining: ${remainingTime}s`;
             }
         }
 
@@ -193,6 +192,7 @@
         }
 
         function resetTimer() {
+            remainingTime = popInterval;
             document.getElementById('timer').textContent = `Time remaining: ${remainingTime}s`;
             clearInterval(timerInterval);
             timerInterval = setInterval(() => {
@@ -204,7 +204,6 @@
                 }
             }, 1000);
         }
-
     </script>
 </head>
 <body>
