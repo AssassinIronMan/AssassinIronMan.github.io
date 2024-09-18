@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Popcorn Pop Detection</title>
+    <title>Popcorn Helper</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css">
     <style>
         body {
@@ -196,7 +196,7 @@
         function closePopup() {
             document.getElementById('popup').style.display = 'none';
             stopDetection();
-            resetTimer(); // Reset timer
+            resetTimer(); // Reset timer when popup is closed
         }
 
         function resetTimer() {
