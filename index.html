@@ -9,6 +9,8 @@
         body {
             background-color: black;
             color: white;
+            margin: 0;
+            padding: 0;
         }
         #status {
             font-weight: bold;
@@ -53,6 +55,21 @@
         .stop-button {
             background-color: red;
             color: white;
+        }
+        .contact-info {
+            color: white;
+            text-align: center;
+            margin: 20px;
+        }
+        .contact-info a {
+            color: inherit;
+            text-decoration: none;
+        }
+        .contact-info a.discord {
+            color: purple;
+        }
+        .contact-info a.youtube {
+            color: red;
         }
     </style>
     <script>
@@ -338,6 +355,10 @@
     <div id="popup" class="popup">
         <div class="message">Popcorn DONE!</div>
         <button onclick="closePopup()">Okay</button>
+    </div>
+
+    <div class="contact-info">
+        If you want to contact me for questions, or to report a bug, or to tell me how good I did, you can email me at <a href="mailto:ironmansky123@gmail.com">ironmansky123@gmail.com</a> or add a comment to one of my <a>YouTube</a> videos or send a message to me on <a>Discord</a>. You can find my Discord server link on my <a href="https://youtube.com" class="youtube">YouTube</a> channel.
     </div>
 
 </body>
