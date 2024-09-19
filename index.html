@@ -52,6 +52,11 @@
             font-weight: bold;
             margin-top: 10px;
         }
+        #popCount {
+            color: white;
+            font-weight: bold;
+            margin-top: 10px;
+        }
         .stop-button {
             background-color: red;
             color: white;
@@ -172,7 +177,8 @@
                     visualizeWaveform();
                     detectPops();
                     detectionStopped = false; // Set to not stopped
-                    popCount = 0; // Reset pop count
+                    popCount = 0; // Reset pop count on start
+                    document.getElementById('popCount').textContent = `Count: ${popCount}`;
                     resetTimer(); // Reset timer
                 } catch (error) {
                     document.getElementById('status').textContent = "Error: Unable to access microphone.";
@@ -237,6 +243,7 @@
 
             if (decibels > volumeThresholdDB) {
                 popCount++;
+                document.getElementById('popCount').textContent = `Count: ${popCount}`; // Update count on page
                 if (silenceTimeout) {
                     clearTimeout(silenceTimeout);
                 }
@@ -245,7 +252,7 @@
 
                 silenceTimeout = setTimeout(() => {
                     if (!detectionStopped) {
-                        showPopup('Popcorn DONE! Count: ' + popCount);
+                        showPopup('Popcorn DONE!');
                         stopDetection();
                     }
                 }, popInterval * 1000); // Using popInterval
@@ -276,7 +283,6 @@
             document.getElementById('smoothingTimeConstantValue').textContent = smoothingTimeConstant;
             document.getElementById('popIntervalValue').textContent = popInterval;
             resetTimer(); // Reset timer
-            popCount = 0; // Reset pop count
 
             if (!detectionStopped) {
                 stopDetection();
@@ -288,13 +294,11 @@
             const popup = document.getElementById('popup');
             popup.querySelector('.message').textContent = message;
             popup.style.display = 'block';
-            document.getElementById('timer').style.display = 'none'; // Hide the timer
         }
 
         function closePopup() {
             stopDetection(); // Ensure detection is stopped when closing the popup
             document.getElementById('popup').style.display = 'none';
-            resetTimer(); // Reset timer
         }
 
         function resetTimer() {
@@ -350,6 +354,7 @@
         </div>
 
         <p id="timer">Time remaining: 2s</p>
+        <p id="popCount">Count: 0</p>
 
         <h3>Settings</h3>
         <div class="setting-group">
@@ -388,7 +393,7 @@
     </div>
 
     <div class="contact-info">
-        If you want to contact me for questions, or to report a bug, or to tell me how good I did, you can email me at <a href="mailto:ironmansky123@gmail.com">ironmansky123@gmail.com</a> or add a comment to one of my <a href="https://youtube.com" class="youtube">YouTube</a> videos or send a message to me on <a href="https://discord.com" class="discord">Discord</a>. You can find my Discord server link on my <a href="https://youtube.com" class="youtube">YouTube</a> channel.
+        If you want to contact me for questions, or to report a bug, or to give suggestions, or to tell me how good I did, you can email me at <a href="mailto:ironmansky123@gmail.com">ironmansky123@gmail.com</a> or add a comment to one of my <a href="https://youtube.com" class="youtube">YouTube</a> videos or send a message to me on <a href="https://discord.com" class="discord">Discord</a>. You can find my Discord server link on my <a href="https://youtube.com" class="youtube">YouTube</a> channel.
     </div>
 
 </body>
