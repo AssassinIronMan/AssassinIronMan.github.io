@@ -1,0 +1,9 @@
+{
+  "devDependencies": {
+    "jest": "^latest",
+    "jsdom": "^latest"
+  },
+  "scripts": {
+    "test": "jest"
+  }
+}
