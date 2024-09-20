@@ -50,7 +50,7 @@ describe('Popcorn Detection Functions', () => {
     test('should stop detection', () => {
         stopDetection();
         expect(mockAudioContext.close).toHaveBeenCalled();
-        expect(detectionStopped).toBe(true;
+        expect(detectionStopped).toBe(true);
     });
 
     test('should correctly detect pops', () => {
