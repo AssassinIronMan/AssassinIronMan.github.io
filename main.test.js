@@ -1,6 +1,7 @@
 // Install dependencies: npm install jest jsdom
 
 // Filename: main.test.js
+import { setCookie, getCookie, loadSettings, saveSettings, resetSettings, startDetection, detectPops } from './main.js';
 
 // Mocking getCookie, setCookie, navigator.mediaDevices and other required objects
 const { setCookie, getCookie, loadSettings, saveSettings, resetSettings, startDetection, detectPops } = require('./main.js');  // Assuming you move your JS code to 'main.js'
