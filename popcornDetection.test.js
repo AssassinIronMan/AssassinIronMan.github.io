@@ -10,6 +10,15 @@ beforeAll(() => {
 });
 
 beforeEach(() => {
+    // Mock DOM elements
+    document.body.innerHTML = `
+        <input id="volumeThreshold" value="-30">
+        <input id="sensitivity" value="256">
+        <input id="smoothingTimeConstant" value="0.3">
+        <input id="popInterval" value="2">
+        <span id="thresholdValue"></span>
+    `;
+
     // Reset mocks before each test
     mockAudioContext = {
         createMediaStreamSource: jest.fn().mockReturnValue({ connect: jest.fn() }),
@@ -27,7 +36,7 @@ beforeEach(() => {
 // Sample unit tests
 describe('Popcorn Detection Functions', () => {
     test('should set default settings correctly', () => {
-        loadSettings();
+        loadSettings();  // Ensure this function is imported or defined
         expect(document.getElementById('volumeThreshold').value).toBe('-30');
         expect(document.getElementById('sensitivity').value).toBe('256');
         expect(document.getElementById('smoothingTimeConstant').value).toBe('0.3');
@@ -36,19 +45,19 @@ describe('Popcorn Detection Functions', () => {
 
     test('should update settings', () => {
         document.getElementById('volumeThreshold').value = '-20';
-        updateSettings();
+        updateSettings();  // Ensure this function is imported or defined
         expect(volumeThresholdDB).toBe(-20);
         expect(document.getElementById('thresholdValue').textContent).toBe('-20');
     });
 
     test('should start detection', async () => {
-        await startDetection();
+        await startDetection();  // Ensure this function is imported or defined
         expect(mockAudioContext.createMediaStreamSource).toHaveBeenCalled();
         expect(mockAnalyser.fftSize).toBe(256);
     });
 
     test('should stop detection', () => {
-        stopDetection();
+        stopDetection();  // Ensure this function is imported or defined
         expect(mockAudioContext.close).toHaveBeenCalled();
         expect(detectionStopped).toBe(true);
     });
@@ -62,7 +71,7 @@ describe('Popcorn Detection Functions', () => {
             array.set(dataArray);
         });
 
-        detectPops();
+        detectPops();  // Ensure this function is imported or defined
         expect(popCount).toBeGreaterThan(0); // Adjust this based on your expected results
     });
 });
