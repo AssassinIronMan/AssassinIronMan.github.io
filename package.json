@@ -5,6 +5,7 @@
   },
   "scripts": {
     "test": "jest"
+  "testEnvironment": "jsdom"
   },
   "name": "assassinironman.github.io",
   "version": "1.0.0",
