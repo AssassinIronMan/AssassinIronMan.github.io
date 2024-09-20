@@ -76,13 +76,18 @@
         .contact-info a.youtube {
             color: red;
         }
-        #resetSettingsButton {
+        /* Red reset button */
+        .reset-button {
             background-color: red;
             color: white;
         }
     </style>
     <script>
-        let volumeThresholdDB = -30, fftSize = 256, smoothingTimeConstant = 0.3, popInterval = 2;
+        let audioContext, microphone, analyser, dataArray;
+        let volumeThresholdDB = -30, fftSize = 256, smoothingTimeConstant = 0.3, popInterval = 2, popCount = 0;
+        let silenceTimeout, canvasCtx, remainingTime = popInterval, timerInterval;
+        let detectionStopped = true, selectedMicId = null;
+
         const defaultSettings = { volumeThresholdDB: -30, fftSize: 256, smoothingTimeConstant: 0.3, popInterval: 2 };
 
         function setCookie(name, value, days) {
@@ -103,14 +108,10 @@
             smoothingTimeConstant = parseFloat(getCookie('smoothingTimeConstant')) || defaultSettings.smoothingTimeConstant;
             popInterval = parseInt(getCookie('popInterval')) || defaultSettings.popInterval;
 
-            document.getElementById('volumeThreshold').value = volumeThresholdDB;
-            document.getElementById('thresholdValue').textContent = volumeThresholdDB;
-            document.getElementById('sensitivity').value = fftSize;
-            document.getElementById('sensitivityValue').textContent = fftSize;
-            document.getElementById('smoothingTimeConstant').value = smoothingTimeConstant;
-            document.getElementById('smoothingTimeConstantValue').textContent = smoothingTimeConstant;
-            document.getElementById('popInterval').value = popInterval;
-            document.getElementById('popIntervalValue').textContent = popInterval;
+            ['volumeThreshold', 'sensitivity', 'smoothingTimeConstant', 'popInterval'].forEach(id => {
+                document.getElementById(id).value = eval(id);
+                document.getElementById(id + 'Value').textContent = eval(id);
+            });
         }
 
         function saveSettings() {
@@ -118,26 +119,83 @@
             setCookie('fftSize', fftSize, 7);
             setCookie('smoothingTimeConstant', smoothingTimeConstant, 7);
             setCookie('popInterval', popInterval, 7);
-            alert("Settings saved successfully!");
         }
 
         function resetSettings() {
-            volumeThresholdDB = defaultSettings.volumeThresholdDB;
-            fftSize = defaultSettings.fftSize;
-            smoothingTimeConstant = defaultSettings.smoothingTimeConstant;
-            popInterval = defaultSettings.popInterval;
-
-            loadSettings();  // Reload the settings to reset the sliders and displayed values
+            Object.assign({ volumeThresholdDB, fftSize, smoothingTimeConstant, popInterval }, defaultSettings);
+            loadSettings();
         }
 
-        function updateSettingsFromSlider(sliderId, valueId, setting) {
-            const value = parseFloat(document.getElementById(sliderId).value);
-            document.getElementById(valueId).textContent = value;
-            eval(`${setting} = ${value}`);
+        function updateSettings() {
+            volumeThresholdDB = parseFloat(document.getElementById('volumeThreshold').value);
+            fftSize = parseInt(document.getElementById('sensitivity').value);
+            smoothingTimeConstant = parseFloat(document.getElementById('smoothingTimeConstant').value);
+            popInterval = parseInt(document.getElementById('popInterval').value);
+
+            ['thresholdValue', 'sensitivityValue', 'smoothingTimeConstantValue', 'popIntervalValue'].forEach(id => {
+                document.getElementById(id).textContent = eval(id.replace('Value', ''));
+            });
+
+            resetTimer();
+            if (!detectionStopped) stopDetection(), startDetection();
         }
 
+        // Update sliders and input fields interaction
         window.onload = function() {
-            loadSettings();  // Load saved settings or defaults when the page is loaded
+            loadSettings();
+            loadMicOptions();
+            addEditableInput('volumeThreshold', 'thresholdValue');
+            addEditableInput('sensitivity', 'sensitivityValue');
+            addEditableInput('smoothingTimeConstant', 'smoothingTimeConstantValue');
+            addEditableInput('popInterval', 'popIntervalValue');
+        }
+
+        function addEditableInput(sliderId, textId) {
+            const slider = document.getElementById(sliderId);
+            const textElement = document.getElementById(textId);
+
+            textElement.addEventListener('click', () => {
+                let input = document.createElement('input');
+                input.type = 'number';
+                input.value = slider.value;
+                input.onblur = function() {
+                    let newValue = parseFloat(input.value);
+                    if (!isNaN(newValue)) {
+                        slider.value = newValue;
+                        updateSettings();
+                    }
+                    textElement.textContent = slider.value;
+                    textElement.style.display = '';
+                };
+
+                textElement.style.display = 'none';
+                textElement.parentNode.insertBefore(input, textElement);
+                input.focus();
+            });
+        }
+
+        async function loadMicOptions() {
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            const micSelect = document.getElementById('micSelect');
+            micSelect.innerHTML = '';
+            devices.filter(device => device.kind === 'audioinput').forEach(device => {
+                const option = document.createElement('option');
+                option.value = device.deviceId;
+                option.textContent = device.label || `Microphone ${micSelect.length + 1}`;
+                micSelect.appendChild(option);
+            });
+            if (micSelect.options.length > 0) micSelect.value = selectedMicId || micSelect.options[0].value;
+        }
+
+        function resetTimer() {
+            remainingTime = popInterval;
+            document.getElementById('timer').textContent = `Time remaining: ${remainingTime}s`;
+            clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                remainingTime--;
+                document.getElementById('timer').textContent = `Time remaining: ${remainingTime}s`;
+                if (remainingTime <= 0) clearInterval(timerInterval);
+            }, 1000);
         }
     </script>
 </head>
@@ -160,35 +218,32 @@
 
         <h3>Settings</h3>
         <div class="setting-group">
-            <label for="volumeThreshold">Volume Threshold (dB): 
-                <span id="thresholdValue">-30</span>
-            </label>
-            <input type="range" id="volumeThreshold" min="-60" max="0" step="1" value="-30" onchange="updateSettingsFromSlider('volumeThreshold', 'thresholdValue', 'volumeThresholdDB')" aria-label="Volume Threshold">
+            <label for="volumeThreshold">Volume Threshold (dB): <span id="thresholdValue">-30</span></label>
+            <input type="range" id="volumeThreshold" min="-60" max="0" value="-30" step="1" onchange="updateSettings()" aria-label="Volume Threshold">
         </div>
 
         <div class="setting-group">
-            <label for="sensitivity">Sensitivity (FFT Size): 
-                <span id="sensitivityValue">256</span>
-            </label>
-            <input type="range" id="sensitivity" min="128" max="1024" step="128" value="256" onchange="updateSettingsFromSlider('sensitivity', 'sensitivityValue', 'fftSize')" aria-label="Sensitivity">
+            <label for="sensitivity">Sensitivity (FFT Size): <span id="sensitivityValue">256</span></label>
+            <input type="range" id="sensitivity" min="128" max="1024" value="256" step="128" onchange="updateSettings()" aria-label="Sensitivity">
         </div>
 
         <div class="setting-group">
-            <label for="smoothingTimeConstant">Smoothing Time Constant: 
-                <span id="smoothingTimeConstantValue">0.3</span>
-            </label>
-            <input type="range" id="smoothingTimeConstant" min="0" max="1" step="0.1" value="0.3" onchange="updateSettingsFromSlider('smoothingTimeConstant', 'smoothingTimeConstantValue', 'smoothingTimeConstant')" aria-label="Smoothing Time Constant">
+            <label for="smoothingTimeConstant">Smoothing Time Constant: <span id="smoothingTimeConstantValue">0.3</span></label>
+            <input type="range" id="smoothingTimeConstant" min="0" max="1" step="0.1" value="0.3" onchange="updateSettings()" aria-label="Smoothing Time Constant">
         </div>
 
         <div class="setting-group">
-            <label for="popInterval">Pop Interval (seconds): 
-                <span id="popIntervalValue">2</span>
-            </label>
-            <input type="range" id="popInterval" min="0" max="60" step="1" value="2" onchange="updateSettingsFromSlider('popInterval', 'popIntervalValue', 'popInterval')" aria-label="Pop Interval">
+            <label for="popInterval">Pop Interval (seconds): <span id="popIntervalValue">2</span></label>
+            <input type="range" id="popInterval" min="0" max="60" value="2" step="1" onchange="updateSettings()" aria-label="Pop Interval">
+        </div>
+
+        <div class="setting-group">
+            <label for="micSelect">Select Microphone:</label>
+            <select id="micSelect" onchange="updateSettings()" aria-label="Microphone Selection"></select>
         </div>
 
         <button type="button" onclick="saveSettings()">Save Settings</button>
-        <button id="resetSettingsButton" type="button" onclick="resetSettings()">Reset Settings</button>
+        <button type="button" class="reset-button" onclick="resetSettings()">Reset Settings</button>
     </main>
 
     <div id="popup" class="popup">
