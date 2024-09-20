@@ -1,7 +1,13 @@
-// popcornDetection.test.js
-
-// Mock functions for AudioContext and MediaStream
 let mockAudioContext, mockAnalyser, mockMicrophone;
+
+beforeAll(() => {
+    global.MediaStream = jest.fn();
+    global.AudioContext = jest.fn(() => mockAudioContext);
+    global.navigator.mediaDevices = {
+        getUserMedia: jest.fn().mockResolvedValue(new global.MediaStream()),
+        enumerateDevices: jest.fn().mockResolvedValue([{ kind: 'audioInput', deviceId: '1', label: 'Microphone 1' }]),
+    };
+});
 
 beforeEach(() => {
     // Reset mocks before each test
@@ -15,12 +21,6 @@ beforeEach(() => {
         smoothingTimeConstant: 0.3,
         frequencyBinCount: 128,
         getByteTimeDomainData: jest.fn(),
-    };
-
-    global.AudioContext = jest.fn(() => mockAudioContext);
-    global.navigator.mediaDevices = {
-        getUserMedia: jest.fn().mockResolvedValue(new MediaStream()),
-        enumerateDevices: jest.fn().mockResolvedValue([{ kind: 'audioInput', deviceId: '1', label: 'Microphone 1' }]),
     };
 });
 
