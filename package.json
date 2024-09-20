@@ -7,9 +7,6 @@
   "scripts": {
     "test": "jest"
   },
- "jest": {
-  "testEnvironment": "jsdom"
-  },
   "name": "assassinironman.github.io",
   "version": "1.0.0",
   "main": "index.js",
