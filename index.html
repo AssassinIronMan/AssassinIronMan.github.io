@@ -34,14 +34,13 @@
         .popup button {
             margin-top: 10px;
         }
-        #decibelMeter {
+        #waveform {
             width: 100%;
-            height: 100px; /* Adjust height as needed */
+            height: 200px;
             background-color: black;
             border: 1px solid #ccc;
-            margin-top: 10px; /* Add space between elements */
         }
-        #decibelCanvas {
+        #waveformCanvas {
             width: 100%;
             height: 100%;
         }
@@ -85,7 +84,7 @@
         let smoothingTimeConstant = 0.3;
         let popCount = 0;
         let silenceTimeout;
-        let decibelCanvas, decibelCtx;
+        let canvas, canvasCtx, width, height;
         let popInterval = 2; // Default pop interval in seconds
         let timerInterval;
         let detectionStopped = true; // Default to stopped
@@ -175,7 +174,7 @@
                     dataArray = new Uint8Array(analyser.frequencyBinCount);
                     microphone.connect(analyser);
 
-                    visualizeDecibelMeter();
+                    visualizeWaveform();
                     detectPops();
                     detectionStopped = false; // Set to not stopped
                     popCount = 0; // Reset pop count on start
@@ -188,48 +187,49 @@
             }
         }
 
-        function visualizeDecibelMeter() {
-            decibelCanvas = document.getElementById('decibelCanvas');
-            decibelCtx = decibelCanvas.getContext('2d');
+        function visualizeWaveform() {
+            canvas = document.getElementById('waveformCanvas');
+            canvasCtx = canvas.getContext('2d');
 
-            function resizeDecibelCanvas() {
-                decibelCanvas.width = window.innerWidth;
-                decibelCanvas.height = 100; // Set height for decibel meter
+            function resizeCanvas() {
+                canvas.width = window.innerWidth;
+                canvas.height = 200; // Fix height for clarity
             }
 
-            window.addEventListener('resize', resizeDecibelCanvas);
-            resizeDecibelCanvas();
+            window.addEventListener('resize', resizeCanvas);
+            resizeCanvas();
 
-            function drawDecibelMeter() {
-                requestAnimationFrame(drawDecibelMeter);
-                
-                // Clear the canvas
-                decibelCtx.fillStyle = 'black';
-                decibelCtx.fillRect(0, 0, decibelCanvas.width, decibelCanvas.height);
-
-                // Calculate decibel level
+            function drawWaveform() {
+                requestAnimationFrame(drawWaveform);
                 analyser.getByteTimeDomainData(dataArray);
-                let rms = 0;
-                for (let i = 0; i < dataArray.length; i++) {
-                    rms += Math.pow(dataArray[i] - 128, 2);
+                canvasCtx.fillStyle = 'black';
+                canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                canvasCtx.lineWidth = 2;
+                canvasCtx.strokeStyle = '#007bff';
+                canvasCtx.beginPath();
+
+                const sliceWidth = canvas.width / analyser.fftSize;
+                let x = 0;
+
+                for (let i = 0; i < analyser.fftSize; i++) {
+                    const v = dataArray[i] / 128.0;
+                    const y = v * canvas.height / 2;
+
+                    if (i === 0) {
+                        canvasCtx.moveTo(x, y);
+                    } else {
+                        canvasCtx.lineTo(x, y);
+                    }
+
+                    x += sliceWidth;
                 }
-                rms = Math.sqrt(rms / dataArray.length);
-                const decibels = 20 * Math.log10(rms / 128);
 
-                // Map decibels to height (for visualization)
-                const barHeight = Math.max(0, Math.min(100, (decibels + 60) * (decibelCanvas.height / 60)));
-
-                // Draw the decibel level as a bar
-                decibelCtx.fillStyle = '#ff0000';
-                decibelCtx.fillRect(0, decibelCanvas.height - barHeight, decibelCanvas.width, barHeight);
-
-                // Draw decibel level as text
-                decibelCtx.fillStyle = 'white';
-                decibelCtx.font = '16px Arial';
-                decibelCtx.fillText(`${Math.round(decibels)} dB`, 10, 20);
+                canvasCtx.lineTo(canvas.width, canvas.height / 2);
+                canvasCtx.stroke();
             }
 
-            drawDecibelMeter();
+            drawWaveform();
         }
 
         function detectPops() {
@@ -242,43 +242,52 @@
             const decibels = 20 * Math.log10(rms / 128);
 
             if (decibels > volumeThresholdDB) {
-                popDetected();
+                popCount++;
+                document.getElementById('popCount').textContent = `Count: ${popCount}`; // Update count on page
+                if (silenceTimeout) {
+                    clearTimeout(silenceTimeout);
+                }
+
+                resetTimer();
+
+                silenceTimeout = setTimeout(() => {
+                    if (!detectionStopped) {
+                        showPopup('Popcorn DONE!');
+                        stopDetection();
+                    }
+                }, popInterval * 1000); // Using popInterval
             }
 
-            silenceTimeout = setTimeout(detectPops, 100);
-        }
-
-        function popDetected() {
-            popCount++;
-            document.getElementById('popCount').textContent = `Count: ${popCount}`;
-            resetTimer();
-        }
-
-        function resetTimer() {
-            if (timerInterval) clearInterval(timerInterval);
-            remainingTime = popInterval;
-            document.getElementById('timer').textContent = `Time: ${remainingTime} seconds`;
-            timerInterval = setInterval(() => {
-                remainingTime--;
-                document.getElementById('timer').textContent = `Time: ${remainingTime} seconds`;
-                if (remainingTime <= 0) {
-                    stopDetection();
-                    showPopup('No pops detected in the last interval. Detection stopped.');
-                }
-            }, 1000);
+            requestAnimationFrame(detectPops);
         }
 
         function stopDetection() {
-            detectionStopped = true; // Set to stopped
-            clearInterval(timerInterval);
-            clearTimeout(silenceTimeout);
-            if (microphone) {
-                microphone.disconnect();
-            }
             if (audioContext) {
                 audioContext.close();
+                document.getElementById('status').textContent = 'Detection stopped.';
+                detectionStopped = true;
+                clearTimeout(silenceTimeout);
+                clearInterval(timerInterval); // Fixes timer reset
             }
-            document.getElementById('status').textContent = "Stopped";
+        }
+
+        function updateSettings() {
+            volumeThresholdDB = parseFloat(document.getElementById('volumeThreshold').value);
+            fftSize = parseInt(document.getElementById('sensitivity').value);
+            smoothingTimeConstant = parseFloat(document.getElementById('smoothingTimeConstant').value);
+            popInterval = parseInt(document.getElementById('popInterval').value);
+            selectedMicId = document.getElementById('micSelect').value;
+
+            document.getElementById('thresholdValue').textContent = volumeThresholdDB;
+            document.getElementById('sensitivityValue').textContent = fftSize;
+            document.getElementById('smoothingTimeConstantValue').textContent = smoothingTimeConstant;
+            document.getElementById('popIntervalValue').textContent = popInterval;
+            resetTimer(); // Reset timer
+
+            if (!detectionStopped) {
+                stopDetection();
+                startDetection();
+            }
         }
 
         function showPopup(message) {
@@ -287,54 +296,105 @@
             popup.style.display = 'block';
         }
 
-        function hidePopup() {
+        function closePopup() {
+            stopDetection(); // Ensure detection is stopped when closing the popup
             document.getElementById('popup').style.display = 'none';
         }
 
-        document.addEventListener('DOMContentLoaded', loadSettings);
+        function resetTimer() {
+            remainingTime = popInterval;
+            document.getElementById('timer').textContent = `Time remaining: ${remainingTime}s`;
+            clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                remainingTime--;
+                document.getElementById('timer').textContent = `Time remaining: ${remainingTime}s`;
+                if (remainingTime <= 0) {
+                    clearInterval(timerInterval);
+                    document.getElementById('timer').textContent = 'Time remaining: 0s';
+                }
+            }, 1000);
+        }
 
+        async function loadMicOptions() {
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            const micSelect = document.getElementById('micSelect');
+            micSelect.innerHTML = ''; // Clear any existing options
+
+            devices.filter(device => device.kind === 'audioInput').forEach(device => {
+                const option = document.createElement('option');
+                option.value = device.deviceId;
+                option.textContent = device.label || `Microphone ${micSelect.length + 1}`;
+                micSelect.appendChild(option);
+            });
+
+            // Select the default microphone if available
+            if (micSelect.options.length > 0) {
+                micSelect.value = selectedMicId || micSelect.options[0].value;
+            }
+        }
+
+        window.onload = function() {
+            loadSettings();
+            loadMicOptions(); // Load microphone options on page load
+        }
     </script>
 </head>
 <body>
-    <header class="container">
-        <h1>Popcorn Pop Detection</h1>
-    </header>
 
     <main class="container">
-        <div id="status">Stopped</div>
+        <h2>Popcorn Helper</h2>
+        
+        <button type="button" onclick="startDetection()">Start Detection</button>
+        <button type="button" class="stop-button" onclick="stopDetection()">Stop Detection</button>
+
+        <p id="status"></p>
+
+        <div id="waveform">
+            <canvas id="waveformCanvas"></canvas>
+        </div>
+
+        <p id="timer">Time remaining: 2s</p>
+        <p id="popCount">Count: 0</p>
+
+        <h3>Settings</h3>
+        <div class="setting-group">
+            <label for="volumeThreshold">Volume Threshold (dB): <span id="thresholdValue">-30</span></label>
+            <input type="range" id="volumeThreshold" min="-60" max="0" value="-30" step="1" onchange="updateSettings()">
+        </div>
 
         <div class="setting-group">
-            <label for="volumeThreshold">Volume Threshold (dB)</label>
-            <input type="range" id="volumeThreshold" min="-60" max="0" step="1" value="-30" oninput="volumeThresholdDB = this.value; document.getElementById('thresholdValue').textContent = this.value;">
-            <span id="thresholdValue">-30</span>
+            <label for="sensitivity">Sensitivity (FFT Size): <span id="sensitivityValue">256</span></label>
+            <input type="range" id="sensitivity" min="128" max="1024" value="256" step="128" onchange="updateSettings()">
+        </div>
+        
+        <div class="setting-group">
+            <label for="smoothingTimeConstant">Smoothing Time Constant: <span id="smoothingTimeConstantValue">0.3</span></label>
+            <input type="range" id="smoothingTimeConstant" min="0" max="1" step="0.1" value="0.3" onchange="updateSettings()">
         </div>
 
         <div class="setting-group">
-            <label for="popInterval">Pop Interval (seconds)</label>
-            <input type="range" id="popInterval" min="1" max="10" step="1" value="2" oninput="popInterval = this.value; document.getElementById('popIntervalValue').textContent = this.value;">
-            <span id="popIntervalValue">2</span>
+            <label for="popInterval">Pop Interval (seconds): <span id="popIntervalValue">2</span></label>
+            <input type="range" id="popInterval" min="0" max="60" value="2" step="1" onchange="updateSettings()">
         </div>
 
-        <div id="timer">Time: 2 seconds</div>
-        <div id="popCount">Count: 0</div>
-
-        <button onclick="startDetection()">Start Detection</button>
-        <button class="stop-button" onclick="stopDetection()">Stop Detection</button>
-
-        <div id="decibelMeter">
-            <canvas id="decibelCanvas"></canvas>
+        <div class="setting-group">
+            <label for="micSelect">Select Microphone:</label>
+            <select id="micSelect" onchange="updateSettings()"></select>
         </div>
 
-        <div id="popup" class="popup">
-            <div class="message">No pops detected.</div>
-            <button onclick="hidePopup()">OK</button>
-        </div>
+        <button type="button" onclick="saveSettings()">Save Settings</button>
+        <button type="button" onclick="resetSettings()">Reset Settings</button>
+
     </main>
 
-    <footer class="container">
-        <div class="contact-info">
-            <p>Made by <a href="#" class="discord">User's Discord</a> | <a href="#" class="youtube">User's YouTube</a></p>
-        </div>
-    </footer>
+    <div id="popup" class="popup">
+        <div class="message">Popcorn DONE!</div>
+        <button onclick="closePopup()">Okay</button>
+    </div>
+
+    <div class="contact-info">
+        If you want to contact me for questions, or to report a bug, or to give suggestions, or to tell me how good I did, you can email me at <a href="mailto:ironmansky123@gmail.com">ironmansky123@gmail.com</a> or add a comment to one of my <a href="https://youtube.com/@assassinironman" class="youtube">YouTube</a> videos or send a message to me on <a href="https://discord.gg/QcvJ4TF" class="discord">Discord</a>.
+    </div>
+
 </body>
 </html>
