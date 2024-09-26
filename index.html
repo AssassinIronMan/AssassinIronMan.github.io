@@ -28,7 +28,7 @@
             z-index: 1000;
         }
         .popup .message {
-            color: black; /* Changed text color for readability */
+            color: black;
             font-weight: bold;
         }
         .popup button {
@@ -40,7 +40,7 @@
             background-color: black;
             border: 1px solid #ccc;
         }
-        #waveformCanvas {
+        #waveformCanvas, #decibelCanvas {
             width: 100%;
             height: 100%;
         }
@@ -76,6 +76,15 @@
         .contact-info a.youtube {
             color: red;
         }
+        .canvas-container {
+            display: flex;
+            gap: 20px;
+            margin-top: 20px;
+        }
+        .canvas-box {
+            flex: 1;
+            height: 200px;
+        }
     </style>
     <script>
         let audioContext, microphone, analyser, dataArray;
@@ -84,12 +93,12 @@
         let smoothingTimeConstant = 0.3;
         let popCount = 0;
         let silenceTimeout;
-        let canvas, canvasCtx, width, height;
-        let popInterval = 2; // Default pop interval in seconds
+        let waveformCanvas, decibelCanvas, canvasCtx, decibelCtx, width, height;
+        let popInterval = 2;
         let timerInterval;
-        let detectionStopped = true; // Default to stopped
+        let detectionStopped = true;
         let remainingTime = popInterval;
-        let selectedMicId = null; // Store the selected microphone ID
+        let selectedMicId = null;
 
         const defaultSettings = {
             volumeThresholdDB: -30,
@@ -176,10 +185,10 @@
 
                     visualizeWaveform();
                     detectPops();
-                    detectionStopped = false; // Set to not stopped
-                    popCount = 0; // Reset pop count on start
+                    detectionStopped = false;
+                    popCount = 0;
                     document.getElementById('popCount').textContent = `Count: ${popCount}`;
-                    resetTimer(); // Reset timer
+                    resetTimer();
                 } catch (error) {
                     document.getElementById('status').textContent = "Error: Unable to access microphone.";
                     console.error('Error accessing microphone:', error);
@@ -188,12 +197,16 @@
         }
 
         function visualizeWaveform() {
-            canvas = document.getElementById('waveformCanvas');
-            canvasCtx = canvas.getContext('2d');
+            waveformCanvas = document.getElementById('waveformCanvas');
+            decibelCanvas = document.getElementById('decibelCanvas');
+            canvasCtx = waveformCanvas.getContext('2d');
+            decibelCtx = decibelCanvas.getContext('2d');
 
             function resizeCanvas() {
-                canvas.width = window.innerWidth;
-                canvas.height = 200; // Fix height for clarity
+                waveformCanvas.width = window.innerWidth / 2 - 20;
+                decibelCanvas.width = window.innerWidth / 2 - 20;
+                waveformCanvas.height = 200;
+                decibelCanvas.height = 200;
             }
 
             window.addEventListener('resize', resizeCanvas);
@@ -203,18 +216,18 @@
                 requestAnimationFrame(drawWaveform);
                 analyser.getByteTimeDomainData(dataArray);
                 canvasCtx.fillStyle = 'black';
-                canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
+                canvasCtx.fillRect(0, 0, waveformCanvas.width, waveformCanvas.height);
                 
                 canvasCtx.lineWidth = 2;
                 canvasCtx.strokeStyle = '#007bff';
                 canvasCtx.beginPath();
 
-                const sliceWidth = canvas.width / analyser.fftSize;
+                const sliceWidth = waveformCanvas.width / analyser.fftSize;
                 let x = 0;
 
                 for (let i = 0; i < analyser.fftSize; i++) {
                     const v = dataArray[i] / 128.0;
-                    const y = v * canvas.height / 2;
+                    const y = v * waveformCanvas.height / 2;
 
                     if (i === 0) {
                         canvasCtx.moveTo(x, y);
@@ -225,11 +238,35 @@
                     x += sliceWidth;
                 }
 
-                canvasCtx.lineTo(canvas.width, canvas.height / 2);
+                canvasCtx.lineTo(waveformCanvas.width, waveformCanvas.height / 2);
                 canvasCtx.stroke();
             }
 
+            function drawDecibelMeter() {
+                requestAnimationFrame(drawDecibelMeter);
+                analyser.getByteTimeDomainData(dataArray);
+
+                let rms = 0;
+                for (let i = 0; i < dataArray.length; i++) {
+                    rms += Math.pow(dataArray[i] - 128, 2);
+                }
+                rms = Math.sqrt(rms / dataArray.length);
+                const decibels = 20 * Math.log10(rms / 128);
+
+                decibelCtx.fillStyle = 'black';
+                decibelCtx.fillRect(0, 0, decibelCanvas.width, decibelCanvas.height);
+
+                const barHeight = Math.max(0, Math.min(100, (decibels + 60) * (decibelCanvas.height / 60)));
+                decibelCtx.fillStyle = '#ff0000';
+                decibelCtx.fillRect(0, decibelCanvas.height - barHeight, decibelCanvas.width, barHeight);
+
+                decibelCtx.fillStyle = 'white';
+                decibelCtx.font = '16px Arial';
+                decibelCtx.fillText(`${Math.round(decibels)} dB`, 10, 20);
+            }
+
             drawWaveform();
+            drawDecibelMeter();
         }
 
         function detectPops() {
@@ -243,158 +280,68 @@
 
             if (decibels > volumeThresholdDB) {
                 popCount++;
-                document.getElementById('popCount').textContent = `Count: ${popCount}`; // Update count on page
-                if (silenceTimeout) {
-                    clearTimeout(silenceTimeout);
-                }
-
+                document.getElementById('popCount').textContent = `Count: ${popCount}`;
                 resetTimer();
-
-                silenceTimeout = setTimeout(() => {
-                    if (!detectionStopped) {
-                        showPopup('Popcorn DONE!');
-                        stopDetection();
-                    }
-                }, popInterval * 1000); // Using popInterval
             }
 
-            requestAnimationFrame(detectPops);
+            if (!detectionStopped) {
+                requestAnimationFrame(detectPops);
+            }
         }
 
         function stopDetection() {
-            if (audioContext) {
-                audioContext.close();
-                document.getElementById('status').textContent = 'Detection stopped.';
-                detectionStopped = true;
-                clearTimeout(silenceTimeout);
-                clearInterval(timerInterval); // Fixes timer reset
-            }
-        }
-
-        function updateSettings() {
-            volumeThresholdDB = parseFloat(document.getElementById('volumeThreshold').value);
-            fftSize = parseInt(document.getElementById('sensitivity').value);
-            smoothingTimeConstant = parseFloat(document.getElementById('smoothingTimeConstant').value);
-            popInterval = parseInt(document.getElementById('popInterval').value);
-            selectedMicId = document.getElementById('micSelect').value;
-
-            document.getElementById('thresholdValue').textContent = volumeThresholdDB;
-            document.getElementById('sensitivityValue').textContent = fftSize;
-            document.getElementById('smoothingTimeConstantValue').textContent = smoothingTimeConstant;
-            document.getElementById('popIntervalValue').textContent = popInterval;
-            resetTimer(); // Reset timer
-
-            if (!detectionStopped) {
-                stopDetection();
-                startDetection();
-            }
-        }
-
-        function showPopup(message) {
-            const popup = document.getElementById('popup');
-            popup.querySelector('.message').textContent = message;
-            popup.style.display = 'block';
-        }
-
-        function closePopup() {
-            stopDetection(); // Ensure detection is stopped when closing the popup
-            document.getElementById('popup').style.display = 'none';
+            detectionStopped = true;
+            clearInterval(timerInterval);
+            document.getElementById('status').textContent = "Detection stopped.";
         }
 
         function resetTimer() {
-            remainingTime = popInterval;
-            document.getElementById('timer').textContent = `Time remaining: ${remainingTime}s`;
             clearInterval(timerInterval);
+            remainingTime = popInterval;
             timerInterval = setInterval(() => {
                 remainingTime--;
-                document.getElementById('timer').textContent = `Time remaining: ${remainingTime}s`;
+                document.getElementById('timer').textContent = `Time: ${remainingTime}s`;
                 if (remainingTime <= 0) {
                     clearInterval(timerInterval);
-                    document.getElementById('timer').textContent = 'Time remaining: 0s';
+                    showPopup();
                 }
             }, 1000);
         }
 
-        async function loadMicOptions() {
-            const devices = await navigator.mediaDevices.enumerateDevices();
-            const micSelect = document.getElementById('micSelect');
-            micSelect.innerHTML = ''; // Clear any existing options
-
-            devices.filter(device => device.kind === 'audioInput').forEach(device => {
-                const option = document.createElement('option');
-                option.value = device.deviceId;
-                option.textContent = device.label || `Microphone ${micSelect.length + 1}`;
-                micSelect.appendChild(option);
-            });
-
-            // Select the default microphone if available
-            if (micSelect.options.length > 0) {
-                micSelect.value = selectedMicId || micSelect.options[0].value;
-            }
+        function showPopup() {
+            const popup = document.getElementById('popcornReadyPopup');
+            popup.style.display = 'block';
         }
 
-        window.onload = function() {
-            loadSettings();
-            loadMicOptions(); // Load microphone options on page load
+        function closePopup() {
+            const popup = document.getElementById('popcornReadyPopup');
+            popup.style.display = 'none';
         }
+
+        document.addEventListener('DOMContentLoaded', loadSettings);
     </script>
 </head>
 <body>
-
     <main class="container">
-        <h2>Popcorn Helper</h2>
-        
-        <button type="button" onclick="startDetection()">Start Detection</button>
-        <button type="button" class="stop-button" onclick="stopDetection()">Stop Detection</button>
-
-        <p id="status"></p>
-
-        <div id="waveform">
-            <canvas id="waveformCanvas"></canvas>
+        <h1>Popcorn Pop Detection</h1>
+        <p id="status">Ready to start listening...</p>
+        <div id="waveform" class="canvas-container">
+            <div class="canvas-box">
+                <canvas id="waveformCanvas"></canvas>
+            </div>
+            <div class="canvas-box">
+                <canvas id="decibelCanvas"></canvas>
+            </div>
         </div>
+        <div id="timer">Time: 0s</div>
+        <div id="popCount">Count: 0</div>
+        <button onclick="startDetection()">Start</button>
+        <button class="stop-button" onclick="stopDetection()">Stop</button>
 
-        <p id="timer">Time remaining: 2s</p>
-        <p id="popCount">Count: 0</p>
-
-        <h3>Settings</h3>
-        <div class="setting-group">
-            <label for="volumeThreshold">Volume Threshold (dB): <span id="thresholdValue">-30</span></label>
-            <input type="range" id="volumeThreshold" min="-60" max="0" value="-30" step="1" onchange="updateSettings()">
+        <div id="popcornReadyPopup" class="popup">
+            <div class="message">Popcorn is ready!</div>
+            <button onclick="closePopup()">Close</button>
         </div>
-
-        <div class="setting-group">
-            <label for="sensitivity">Sensitivity (FFT Size): <span id="sensitivityValue">256</span></label>
-            <input type="range" id="sensitivity" min="128" max="1024" value="256" step="128" onchange="updateSettings()">
-        </div>
-        
-        <div class="setting-group">
-            <label for="smoothingTimeConstant">Smoothing Time Constant: <span id="smoothingTimeConstantValue">0.3</span></label>
-            <input type="range" id="smoothingTimeConstant" min="0" max="1" step="0.1" value="0.3" onchange="updateSettings()">
-        </div>
-
-        <div class="setting-group">
-            <label for="popInterval">Pop Interval (seconds): <span id="popIntervalValue">2</span></label>
-            <input type="range" id="popInterval" min="0" max="60" value="2" step="1" onchange="updateSettings()">
-        </div>
-
-        <div class="setting-group">
-            <label for="micSelect">Select Microphone:</label>
-            <select id="micSelect" onchange="updateSettings()"></select>
-        </div>
-
-        <button type="button" onclick="saveSettings()">Save Settings</button>
-        <button type="button" onclick="resetSettings()">Reset Settings</button>
-
     </main>
-
-    <div id="popup" class="popup">
-        <div class="message">Popcorn DONE!</div>
-        <button onclick="closePopup()">Okay</button>
-    </div>
-
-    <div class="contact-info">
-        If you want to contact me for questions, or to report a bug, or to give suggestions, or to tell me how good I did, you can email me at <a href="mailto:ironmansky123@gmail.com">ironmansky123@gmail.com</a> or add a comment to one of my <a href="https://youtube.com/@assassinironman" class="youtube">YouTube</a> videos or send a message to me on <a href="https://discord.gg/QcvJ4TF" class="discord">Discord</a>.
-    </div>
-
 </body>
 </html>
