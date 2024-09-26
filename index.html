@@ -28,7 +28,7 @@
             z-index: 1000;
         }
         .popup .message {
-            color: black;
+            color: black; /* Changed text color for readability */
             font-weight: bold;
         }
         .popup button {
@@ -40,16 +40,9 @@
             background-color: black;
             border: 1px solid #ccc;
         }
-        #waveformCanvas, #decibelCanvas {
+        #waveformCanvas {
             width: 100%;
             height: 100%;
-        }
-        #decibelMeter {
-            width: 100%;
-            height: 100px;
-            background-color: black;
-            border: 1px solid #ccc;
-            margin-top: 20px;
         }
         .setting-group {
             margin-bottom: 20px;
@@ -92,12 +85,11 @@
         let popCount = 0;
         let silenceTimeout;
         let canvas, canvasCtx, width, height;
-        let decibelCanvas, decibelCtx;
-        let popInterval = 2;
+        let popInterval = 2; // Default pop interval in seconds
         let timerInterval;
-        let detectionStopped = true;
+        let detectionStopped = true; // Default to stopped
         let remainingTime = popInterval;
-        let selectedMicId = null;
+        let selectedMicId = null; // Store the selected microphone ID
 
         const defaultSettings = {
             volumeThresholdDB: -30,
@@ -105,6 +97,68 @@
             smoothingTimeConstant: 0.3,
             popInterval: 2
         };
+
+        function setCookie(name, value, days) {
+            let expires = "";
+            if (days) {
+                const date = new Date();
+                date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+                expires = "; expires=" + date.toUTCString();
+            }
+            document.cookie = name + "=" + (value || "") + expires + "; path=/";
+        }
+
+        function getCookie(name) {
+            const nameEQ = name + "=";
+            const ca = document.cookie.split(';');
+            for (let i = 0; i < ca.length; i++) {
+                let c = ca[i];
+                while (c.charAt(0) === ' ') c = c.substring(1, c.length);
+                if (c.indexOf(nameEQ) === 0) return c.substring(nameEQ.length, c.length);
+            }
+            return null;
+        }
+
+        function loadSettings() {
+            volumeThresholdDB = parseFloat(getCookie('volumeThresholdDB')) || defaultSettings.volumeThresholdDB;
+            fftSize = parseInt(getCookie('fftSize')) || defaultSettings.fftSize;
+            smoothingTimeConstant = parseFloat(getCookie('smoothingTimeConstant')) || defaultSettings.smoothingTimeConstant;
+            popInterval = parseInt(getCookie('popInterval')) || defaultSettings.popInterval;
+
+            document.getElementById('volumeThreshold').value = volumeThresholdDB;
+            document.getElementById('sensitivity').value = fftSize;
+            document.getElementById('smoothingTimeConstant').value = smoothingTimeConstant;
+            document.getElementById('popInterval').value = popInterval;
+
+            document.getElementById('thresholdValue').textContent = volumeThresholdDB;
+            document.getElementById('sensitivityValue').textContent = fftSize;
+            document.getElementById('smoothingTimeConstantValue').textContent = smoothingTimeConstant;
+            document.getElementById('popIntervalValue').textContent = popInterval;
+        }
+
+        function saveSettings() {
+            setCookie('volumeThresholdDB', volumeThresholdDB, 7);
+            setCookie('fftSize', fftSize, 7);
+            setCookie('smoothingTimeConstant', smoothingTimeConstant, 7);
+            setCookie('popInterval', popInterval, 7);
+        }
+
+        function resetSettings() {
+            volumeThresholdDB = defaultSettings.volumeThresholdDB;
+            fftSize = defaultSettings.fftSize;
+            smoothingTimeConstant = defaultSettings.smoothingTimeConstant;
+            popInterval = defaultSettings.popInterval;
+
+            document.getElementById('volumeThreshold').value = volumeThresholdDB;
+            document.getElementById('sensitivity').value = fftSize;
+            document.getElementById('smoothingTimeConstant').value = smoothingTimeConstant;
+            document.getElementById('popInterval').value = popInterval;
+
+            document.getElementById('thresholdValue').textContent = volumeThresholdDB;
+            document.getElementById('sensitivityValue').textContent = fftSize;
+            document.getElementById('smoothingTimeConstantValue').textContent = smoothingTimeConstant;
+            document.getElementById('popIntervalValue').textContent = popInterval;
+        }
 
         async function startDetection() {
             if (detectionStopped) {
@@ -121,12 +175,11 @@
                     microphone.connect(analyser);
 
                     visualizeWaveform();
-                    visualizeDecibelMeter();
                     detectPops();
-                    detectionStopped = false;
-                    popCount = 0;
+                    detectionStopped = false; // Set to not stopped
+                    popCount = 0; // Reset pop count on start
                     document.getElementById('popCount').textContent = `Count: ${popCount}`;
-                    resetTimer();
+                    resetTimer(); // Reset timer
                 } catch (error) {
                     document.getElementById('status').textContent = "Error: Unable to access microphone.";
                     console.error('Error accessing microphone:', error);
@@ -140,7 +193,7 @@
 
             function resizeCanvas() {
                 canvas.width = window.innerWidth;
-                canvas.height = 200;
+                canvas.height = 200; // Fix height for clarity
             }
 
             window.addEventListener('resize', resizeCanvas);
@@ -151,7 +204,7 @@
                 analyser.getByteTimeDomainData(dataArray);
                 canvasCtx.fillStyle = 'black';
                 canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
-
+                
                 canvasCtx.lineWidth = 2;
                 canvasCtx.strokeStyle = '#007bff';
                 canvasCtx.beginPath();
@@ -179,33 +232,6 @@
             drawWaveform();
         }
 
-        function visualizeDecibelMeter() {
-            decibelCanvas = document.getElementById('decibelCanvas');
-            decibelCtx = decibelCanvas.getContext('2d');
-
-            function drawDecibelMeter() {
-                requestAnimationFrame(drawDecibelMeter);
-
-                analyser.getByteTimeDomainData(dataArray);
-                let rms = 0;
-                for (let i = 0; i < dataArray.length; i++) {
-                    rms += Math.pow(dataArray[i] - 128, 2);
-                }
-                rms = Math.sqrt(rms / dataArray.length);
-                const decibels = 20 * Math.log10(rms / 128);
-
-                decibelCtx.clearRect(0, 0, decibelCanvas.width, decibelCanvas.height);
-                decibelCtx.fillStyle = 'black';
-                decibelCtx.fillRect(0, 0, decibelCanvas.width, decibelCanvas.height);
-
-                const barHeight = Math.max(0, (decibels + 60) * (decibelCanvas.height / 60));
-                decibelCtx.fillStyle = '#00ff00';
-                decibelCtx.fillRect(0, decibelCanvas.height - barHeight, decibelCanvas.width, barHeight);
-            }
-
-            drawDecibelMeter();
-        }
-
         function detectPops() {
             analyser.getByteTimeDomainData(dataArray);
             let rms = 0;
@@ -217,7 +243,7 @@
 
             if (decibels > volumeThresholdDB) {
                 popCount++;
-                document.getElementById('popCount').textContent = `Count: ${popCount}`;
+                document.getElementById('popCount').textContent = `Count: ${popCount}`; // Update count on page
                 if (silenceTimeout) {
                     clearTimeout(silenceTimeout);
                 }
@@ -229,7 +255,7 @@
                         showPopup('Popcorn DONE!');
                         stopDetection();
                     }
-                }, popInterval * 1000);
+                }, popInterval * 1000); // Using popInterval
             }
 
             requestAnimationFrame(detectPops);
@@ -241,13 +267,75 @@
                 document.getElementById('status').textContent = 'Detection stopped.';
                 detectionStopped = true;
                 clearTimeout(silenceTimeout);
-                clearInterval(timerInterval);
+                clearInterval(timerInterval); // Fixes timer reset
+            }
+        }
+
+        function updateSettings() {
+            volumeThresholdDB = parseFloat(document.getElementById('volumeThreshold').value);
+            fftSize = parseInt(document.getElementById('sensitivity').value);
+            smoothingTimeConstant = parseFloat(document.getElementById('smoothingTimeConstant').value);
+            popInterval = parseInt(document.getElementById('popInterval').value);
+            selectedMicId = document.getElementById('micSelect').value;
+
+            document.getElementById('thresholdValue').textContent = volumeThresholdDB;
+            document.getElementById('sensitivityValue').textContent = fftSize;
+            document.getElementById('smoothingTimeConstantValue').textContent = smoothingTimeConstant;
+            document.getElementById('popIntervalValue').textContent = popInterval;
+            resetTimer(); // Reset timer
+
+            if (!detectionStopped) {
+                stopDetection();
+                startDetection();
+            }
+        }
+
+        function showPopup(message) {
+            const popup = document.getElementById('popup');
+            popup.querySelector('.message').textContent = message;
+            popup.style.display = 'block';
+        }
+
+        function closePopup() {
+            stopDetection(); // Ensure detection is stopped when closing the popup
+            document.getElementById('popup').style.display = 'none';
+        }
+
+        function resetTimer() {
+            remainingTime = popInterval;
+            document.getElementById('timer').textContent = `Time remaining: ${remainingTime}s`;
+            clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                remainingTime--;
+                document.getElementById('timer').textContent = `Time remaining: ${remainingTime}s`;
+                if (remainingTime <= 0) {
+                    clearInterval(timerInterval);
+                    document.getElementById('timer').textContent = 'Time remaining: 0s';
+                }
+            }, 1000);
+        }
+
+        async function loadMicOptions() {
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            const micSelect = document.getElementById('micSelect');
+            micSelect.innerHTML = ''; // Clear any existing options
+
+            devices.filter(device => device.kind === 'audioInput').forEach(device => {
+                const option = document.createElement('option');
+                option.value = device.deviceId;
+                option.textContent = device.label || `Microphone ${micSelect.length + 1}`;
+                micSelect.appendChild(option);
+            });
+
+            // Select the default microphone if available
+            if (micSelect.options.length > 0) {
+                micSelect.value = selectedMicId || micSelect.options[0].value;
             }
         }
 
         window.onload = function() {
             loadSettings();
-            loadMicOptions();
+            loadMicOptions(); // Load microphone options on page load
         }
     </script>
 </head>
@@ -265,16 +353,48 @@
             <canvas id="waveformCanvas"></canvas>
         </div>
 
-        <div id="decibelMeter">
-            <canvas id="decibelCanvas"></canvas>
-        </div>
-
         <p id="timer">Time remaining: 2s</p>
         <p id="popCount">Count: 0</p>
 
-        <!-- Settings and other content here -->
+        <h3>Settings</h3>
+        <div class="setting-group">
+            <label for="volumeThreshold">Volume Threshold (dB): <span id="thresholdValue">-30</span></label>
+            <input type="range" id="volumeThreshold" min="-60" max="0" value="-30" step="1" onchange="updateSettings()">
+        </div>
+
+        <div class="setting-group">
+            <label for="sensitivity">Sensitivity (FFT Size): <span id="sensitivityValue">256</span></label>
+            <input type="range" id="sensitivity" min="128" max="1024" value="256" step="128" onchange="updateSettings()">
+        </div>
+        
+        <div class="setting-group">
+            <label for="smoothingTimeConstant">Smoothing Time Constant: <span id="smoothingTimeConstantValue">0.3</span></label>
+            <input type="range" id="smoothingTimeConstant" min="0" max="1" step="0.1" value="0.3" onchange="updateSettings()">
+        </div>
+
+        <div class="setting-group">
+            <label for="popInterval">Pop Interval (seconds): <span id="popIntervalValue">2</span></label>
+            <input type="range" id="popInterval" min="0" max="60" value="2" step="1" onchange="updateSettings()">
+        </div>
+
+        <div class="setting-group">
+            <label for="micSelect">Select Microphone:</label>
+            <select id="micSelect" onchange="updateSettings()"></select>
+        </div>
+
+        <button type="button" onclick="saveSettings()">Save Settings</button>
+        <button type="button" onclick="resetSettings()">Reset Settings</button>
 
     </main>
+
+    <div id="popup" class="popup">
+        <div class="message">Popcorn DONE!</div>
+        <button onclick="closePopup()">Okay</button>
+    </div>
+
+    <div class="contact-info">
+        If you want to contact me for questions, or to report a bug, or to tell me how good I did, you can email me at <a href="mailto:ironmansky123@gmail.com">ironmansky123@gmail.com</a> or add a comment to one of my <a href="https://youtube.com" class="youtube">YouTube</a> videos or send a message to me on <a href="https://discord.com" class="discord">Discord</a>. You can find my Discord server link on my <a href="https://youtube.com" class="youtube">YouTube</a> channel.
+    </div>
 
 </body>
 </html>
